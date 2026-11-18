@@ -26,9 +26,7 @@ in
 
     providers.services.units.nftables-flush = {
       description = "unload the firewall ruleset";
-      requires = [ "stopped" ];
-
-      type.oneshot.command = cfg.stopScript;
+      type.shutdown.command = cfg.stopScript;
     };
 
     providers.services.tmpfiles.rules = [

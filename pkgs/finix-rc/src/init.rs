@@ -35,7 +35,9 @@ pub fn run(manifest: &Manifest, manifest_path: &str) -> ExitCode {
         return ExitCode::from(1);
     };
 
-    for (name, _) in manifest.boot_side() {
+    // every unit in the manifest has a job: the shutdown units are not in it, being steps in
+    // `shutdown_command` rather than anything to start
+    for name in manifest.units.keys() {
         let spawned = Command::new(&exe)
             .arg("job")
             .arg(manifest_path)

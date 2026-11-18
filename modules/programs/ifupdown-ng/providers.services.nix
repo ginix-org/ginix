@@ -54,9 +54,7 @@ in
 
     providers.services.units.ifupdown-ng-down = {
       description = "bring down network interfaces";
-      requires = [ "stopped" ];
-
-      type.oneshot.command = pkgs.writeShellScript "ifdown" ''
+      type.shutdown.command = pkgs.writeShellScript "ifdown" ''
         ${cfg.package}/bin/ifdown -E ${cfg.package}/libexec/ifupdown-ng ${lib.escapeShellArgs cfg.extraArgs}
       '';
     };

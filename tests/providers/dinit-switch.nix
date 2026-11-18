@@ -43,8 +43,6 @@
         "basic"
         "multi-user"
         "running"
-        "stopped"
-        "shutdown"
       ];
 
       providers.services.units = {

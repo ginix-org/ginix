@@ -29,45 +29,7 @@ let
   # graph already carries every ordering constraint that matters via `conditions`, so nothing
   # here needs runlevel S to mean anything; landing in the configured runlevel as fast as finit
   # can manage and letting the graph take it from there is the point.
-  #
-  # shutdown-side stanzas sit in exactly 0 and 6, which is the only vocabulary finit has for
-  # "on the way out".
   bootRunlevels = "12345789";
-  shutdownRunlevels = "06";
-
-  indexOf =
-    name:
-    lib.findFirst (i: i != null) null (lib.imap0 (i: l: if l == name then i else null) trunk.levels);
-
-  latchIndex = indexOf trunk.latch;
-
-  # a unit is on the shutdown side if it is a trunk level at or after the latch, or if it
-  # attached itself to one. attaching to more than one level is refused by the contract, so
-  # the first match is the only match.
-  levelFor =
-    name: unit:
-    if lib.elem name trunk.levels then
-      name
-    else
-      lib.findFirst (dep: lib.elem dep trunk.levels) null unit.requires;
-
-  onShutdownSide =
-    name: unit:
-    let
-      level = levelFor name unit;
-    in
-    latchIndex != null && level != null && indexOf level >= latchIndex;
-
-  runlevelsFor = name: unit: if onShutdownSide name unit then shutdownRunlevels else bootRunlevels;
-
-  # where a unit sits in the trunk, as a number. this orders the steps of the generated
-  # shutdown script below; finit itself never sees it.
-  priorityFor =
-    name: unit:
-    let
-      i = indexOf (levelFor name unit);
-    in
-    if lib.elem name trunk.levels then i * 100 else i * 100 + 50;
 
   # finit has no process-less stanza, so an anchor is a task running `true`. `remain` stops it
   # re-running, and its `task/<name>/success` condition then holds for the rest of the runlevel.
@@ -157,7 +119,7 @@ let
             i: chunk:
             lib.nameValuePair (linkName name i) {
               description = "${name} prerequisites, part ${toString (i + 1)} of ${toString (last + 1)}";
-              runlevel = runlevelsFor name unit;
+              runlevel = bootRunlevels;
               command = true';
               remain-after-exit = true;
               conditions = chunk ++ lib.optional (i > 0) (taskCondition (linkName name (i - 1)));
@@ -171,7 +133,7 @@ let
     {
       inherit (unit) description;
 
-      runlevel = runlevelsFor name unit;
+      runlevel = bootRunlevels;
       conditions = (chainFor name unit).conditions;
       environment = unit.environment;
 
@@ -300,7 +262,7 @@ let
     {
       description = "${name} has started";
 
-      runlevel = runlevelsFor name unit;
+      runlevel = bootRunlevels;
       conditions = [ (readyConditionOf name) ];
       command = if wait == null || waitKindOf' unit == "pidfile" then true' else wait;
       remain-after-exit = true;
@@ -308,10 +270,7 @@ let
 
   isService = _: unit: kindOf unit == "service";
 
-  enabled = lib.filterAttrs (_: u: u.enable) cfg.units;
-
-  bootSide = lib.filterAttrs (name: unit: !(onShutdownSide name unit)) enabled;
-  shutdownSide = lib.filterAttrs onShutdownSide enabled;
+  bootSide = shutdownLib.bootSideOf cfg.units;
 
   services = lib.filterAttrs isService bootSide;
 in
@@ -505,9 +464,8 @@ in
         };
       };
 
-      # on the script rather than on shutdownSide being non-empty: the levels at and after the
-      # latch are themselves shutdown-side units, so that set is never empty, while a machine
-      # whose shutdown side is only those anchors has nothing to run and gets no script.
+      # the shutdown units, as the one script finit runs on the way down - null when there are
+      # none, and then there is no hook at all.
       environment.etc = lib.optionalAttrs (shutdownScript != null) {
         "finit/hook/sys/shutdown/providers-services-shutdown".source = shutdownScript;
       };
@@ -538,7 +496,7 @@ in
               else
                 printf '%s\tstopped\n' ${lib.escapeShellArg name}
               fi
-            '') (lib.filterAttrs (_: u: u.enable) cfg.units)
+            '') bootSide
           )
         )
       );

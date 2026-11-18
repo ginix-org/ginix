@@ -134,8 +134,8 @@ fn kill(latches: &Latches) {
     }
 }
 
-/// The shutdown side of the trunk, which `providers/services/shutdown.nix` has already lowered
-/// into a single script in trunk order.
+/// The shutdown units, which `providers/services/shutdown.nix` has already lowered into a
+/// single script in dependency order.
 ///
 /// It stays a script. The ordering problem that script exists to solve is a Nix-side one - no
 /// init reliably orders units on the way down, so the order is resolved at evaluation time - and

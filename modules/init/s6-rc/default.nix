@@ -23,7 +23,6 @@
 }:
 let
   cfg = config.providers.services;
-  enabled = lib.filterAttrs (_: u: u.enable) cfg.units;
 
   kindOf = unit: lib.head (lib.attrNames unit.type);
   variantOf = unit: unit.type.${kindOf unit};
@@ -51,10 +50,10 @@ let
   shutdownLib = import ../../providers/services/shutdown.nix { inherit pkgs lib; };
 
   # the `everything` bundle is brought up at boot, and s6-rc has no notion of a unit which is
-  # in the database but not to be started yet. A shutdown-side unit compiled into it therefore
-  # ran during boot, which is not late but wrong - so the database is built from the boot side
-  # alone, and the shutdown side is run from rc.shutdown instead.
-  bootSide = lib.filterAttrs (name: unit: !(shutdownLib.onShutdownSide cfg.trunk name unit)) enabled;
+  # in the database but not to be started yet. A shutdown unit compiled into it would therefore
+  # run during boot, which is not late but wrong - so the database is built from the boot side
+  # alone, and the shutdown units are run from rc.shutdown instead.
+  bootSide = shutdownLib.bootSideOf cfg.units;
 
   shutdownScript = shutdownLib.scriptFor cfg;
 
@@ -63,16 +62,15 @@ let
   # set - it has no state, so s6-rc will neither list it nor change it.
   atomic = lib.filterAttrs (_: unit: kindOf unit != "anchor") bootSide;
 
-  # everything in the generation which s6-rc has no state for: the shutdown side, which is not
-  # in the database because s6-rc starts what it knows about at boot, and the anchors, which
-  # are bundles.
+  # everything the switch knows of which s6-rc has no state for: the anchors, which are
+  # bundles.
   #
   # `list` reports them with the fingerprint this generation was built from. They are not
-  # running - an anchor never is, and the shutdown side only runs on the way down - but neither
-  # can the engine start them. Reporting nothing would leave them in the incoming tree and out
-  # of the current one, so every switch would resolve to "start the shutdown side and every
-  # level", forever. Reported as already matching, the engine finds nothing to do.
-  unmanaged = lib.filterAttrs (name: _: !(atomic ? ${name})) enabled;
+  # running - an anchor never is - but neither can the engine start them. Reporting nothing
+  # would leave them in the incoming tree and out of the current one, so every switch would
+  # resolve to "start every level", forever. Reported as already matching, the engine finds
+  # nothing to do.
+  unmanaged = lib.filterAttrs (name: _: !(atomic ? ${name})) bootSide;
 
   reportUnmanaged = lib.concatStrings (
     lib.mapAttrsToList (
@@ -80,11 +78,9 @@ let
     ) unmanaged
   );
 
-  # the engine reconciles the whole incoming tree, which includes the shutdown side and the
-  # anchors - neither of which s6-rc can be asked about. The shutdown side is deliberately not
-  # in this database, because s6-rc starts everything it knows about at boot; the anchors are
-  # bundles. Naming either fails the entire change, taking the units which do exist down with
-  # it. Reads unit names on stdin and leaves the survivors in $units.
+  # the engine reconciles the whole incoming tree, which includes the anchors - which s6-rc
+  # cannot be asked about, being bundles. Naming one fails the entire change, taking the units
+  # which do exist down with it. Reads unit names on stdin and leaves the survivors in $units.
   knownFilter = ''
     known=" ${lib.concatStringsSep " " (lib.attrNames atomic)} "
     units=""
@@ -483,16 +479,15 @@ let
     exec ${lib.getExe' s6rc "s6-rc"} -l ${live} -v2 -up change everything
     EOF
 
-    # the way down. s6-rc brings the whole set down in dependency order, which is the shutdown
-    # side of the trunk falling out of the graph rather than a sequence written by hand - finit
-    # needed a generated script for this and dinit an inverted chain of stop-commands.
+    # the way down. s6-rc brings the whole set down in dependency order, then the shutdown units
+    # run, as the one script the contract lowers them into.
     cat > $out/rc.shutdown <<'EOF'
     #!${pkgs.runtimeShell} -e
     exec >/dev/console 2>&1
 
     # everything the database knows about, brought down in dependency order first - so the
-    # contract's shutdown side runs with the boot side already stopped, which is what the latch
-    # means. Not exec'd, because there is something to do afterwards.
+    # shutdown units run with everything else already stopped, which is what a shutdown unit
+    # is promised. Not exec'd, because there is something to do afterwards.
     ${lib.getExe' s6rc "s6-rc"} -l ${live} -v2 -bDa change
 
     ${lib.optionalString (shutdownScript != null) shutdownScript}

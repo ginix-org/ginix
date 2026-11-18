@@ -8,9 +8,9 @@
 #      retracts, finit cannot express a dependency which gates starting without also
 #      propagating stops, and the encoding has to change.
 #
-#   2. does finit run the shutdown-side `[06]` stanzas after tearing the boot-side
-#      services down, or concurrently with it? the trunk's latch level is named
-#      `stopped`, and that name is only honest if teardown has finished by then.
+#   2. does finit run the shutdown units after tearing the boot-side services down, or
+#      concurrently with it? a shutdown unit is promised that everything else has stopped,
+#      and that is only honest if teardown has finished by then.
 {
   name = "providers.services";
 
@@ -64,17 +64,16 @@
         };
 
         # left running for the shutdown test, so its marker file is still there when the
-        # shutdown-side units run
+        # shutdown units run
         delta = {
           type.service.command = daemon "delta";
           requires = [ "sysinit" ];
         };
 
-        # shutdown side: attaches to a level after the latch, and reports both that it ran
-        # at all and whether the boot-side services were gone by the time it did
+        # a shutdown unit, which reports both that it ran at all and whether the boot-side
+        # services were gone by the time it did
         late = {
-          requires = [ "stopped" ];
-          type.oneshot.command = pkgs.writeShellScript "late" ''
+          type.shutdown.command = pkgs.writeShellScript "late" ''
             if [ -e /run/svc-test/delta.running ]; then
               echo "SHUTDOWN-STEP late RACE delta still running" > /dev/console
             else
@@ -83,11 +82,11 @@
           '';
         };
 
-        # a second step after `late`, to prove the shutdown sequence runs to its end rather
+        # a second step, requiring `late`, to prove the shutdown sequence runs to its end rather
         # than being cut off partway by the power going down
         later = {
-          requires = [ "stopped" ];
-          type.oneshot.command = pkgs.writeShellScript "later" ''
+          requires = [ "late" ];
+          type.shutdown.command = pkgs.writeShellScript "later" ''
             echo "SHUTDOWN-STEP later" > /dev/console
           '';
         };
@@ -141,10 +140,8 @@
             machine.succeed(f"test -f /run/finit/cond/task/{level}/success")
             assert cond(f"task/{level}/success") == "on", f"{level} not reached"
 
-    with subtest("the latch does not resolve while the system is running"):
-        # `stopped` and `shutdown` exist only in runlevels 0 and 6
-        machine.fail("test -f /run/finit/cond/task/stopped/success")
-        machine.fail("test -f /run/finit/cond/task/shutdown/success")
+    with subtest("the shutdown units do not run while the system is up"):
+        # a shutdown unit is a step in a script, not a stanza, and has not run
         machine.fail("test -f /run/svc-test/late.ran")
 
     with subtest("units attached to the trunk all started"):

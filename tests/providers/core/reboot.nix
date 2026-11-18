@@ -43,13 +43,12 @@ in
           requires = [ "sysinit" ];
         };
 
-        # the shutdown side runs on a reboot too, which is not obvious and is worth pinning: on
+        # the shutdown units run on a reboot too, which is not obvious and is worth pinning: on
         # every thin backend it is the same program reaching the same lowered script, with only
         # the final syscall differing, and a backend which skipped it on one path and not the
         # other would still pass the poweroff test next door.
         on-the-way-down = {
-          requires = [ "stopped" ];
-          type.oneshot.command = pkgs.writeShellScript "reboot-down" ''
+          type.shutdown.command = pkgs.writeShellScript "reboot-down" ''
             echo "CORE-REBOOT-DOWN" > /dev/console
           '';
         };

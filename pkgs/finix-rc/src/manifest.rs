@@ -11,10 +11,9 @@
 //! searches, orders or resolves anything - `requires` is already the exact list of latches to
 //! wait for, in no particular order because they are all waited for.
 //!
-//! One file for the whole generation rather than one per unit, because three of the seven
-//! subcommands need to see units they are not running: `list` reports the shutdown side it
-//! will never start, `activate` has to map a name read off stdin to a unit, and `shutdown`
-//! needs the whole boot side to know what to stop.
+//! One file for the whole generation rather than one per unit, because two of the seven
+//! subcommands need to see units they are not running: `activate` has to map a name read off
+//! stdin to a unit, and `shutdown` needs every unit to know what to stop.
 
 use serde::Deserialize;
 use std::collections::BTreeMap;
@@ -35,8 +34,9 @@ pub struct Manifest {
     /// command rather than a setuid call in this process.
     pub chpst: String,
 
-    /// the lowered shutdown side - `providers/services/shutdown.nix`, one script in trunk
-    /// order - or absent when this generation has no shutdown-side unit with anything to run.
+    /// the shutdown units, lowered by `providers/services/shutdown.nix` into one script in
+    /// dependency order - or absent when this generation has none. They are not in `units`: a
+    /// shutdown unit has no job, only a step in this script.
     #[serde(default)]
     pub shutdown_command: Option<String>,
 
@@ -50,8 +50,7 @@ pub struct Unit {
     /// has been launched" rather than "and it finished starting".
     pub fingerprint: String,
 
-    /// the latches to wait for, already resolved. Every edge in the trunk and every explicit
-    /// `requires` has been flattened into this by the time it is written.
+    /// the latches to wait for, already resolved: the unit's `requires`, exactly.
     #[serde(default)]
     pub requires: Vec<String>,
 
@@ -79,11 +78,6 @@ pub struct Unit {
     /// `waitFor.check`, where it is the unit's own.
     #[serde(default)]
     pub readiness_command: Option<String>,
-
-    /// units on the shutdown side are not started at boot and have no job. They are in the
-    /// manifest because `list` must report them; see `switch::list`.
-    #[serde(default)]
-    pub shutdown_side: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
@@ -102,12 +96,5 @@ impl Manifest {
         let text =
             std::fs::read_to_string(path).map_err(|e| format!("reading manifest {path}: {e}"))?;
         serde_json::from_str(&text).map_err(|e| format!("parsing manifest {path}: {e}"))
-    }
-
-    /// everything with a job - which is everything not on the shutdown side. The order is
-    /// `BTreeMap`'s, so it is stable across boots and across the subcommands that iterate it;
-    /// nothing depends on it being the trunk order, because the waiting is what orders a boot.
-    pub fn boot_side(&self) -> impl Iterator<Item = (&String, &Unit)> {
-        self.units.iter().filter(|(_, u)| !u.shutdown_side)
     }
 }

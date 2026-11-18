@@ -66,7 +66,8 @@ let
   unitId = idOf "u_";
 
   # shape carries the kind, so the picture says what a node is without a legend: a hexagon is a
-  # trunk level, a rounded box a long-running service, a square box something which runs once.
+  # trunk level, a rounded box a long-running service, a square box something which runs once,
+  # and a trapezoid a step on the way down.
   nodeFor =
     name: unit:
     let
@@ -80,16 +81,8 @@ let
 
       # and what else is worth knowing about that kind. For a service it is the readiness it
       # resolved to, which is the part of a unit most likely to be wrong and least likely to
-      # be visible. For the latch it is the word `latch`: it is the one level with no incoming
-      # edge, so the graph falls into two pieces there, and unlabelled that reads like a
-      # missing edge rather than the shutdown side beginning.
-      note =
-        if isLevel name && name == trunk.latch then
-          " · latch"
-        else if readiness != null then
-          " · ${readiness}"
-        else
-          "";
+      # be visible.
+      note = if readiness != null then " · ${readiness}" else "";
 
       label = ''"${name}<br/>${kind}${note}"'';
       id = unitId name;
@@ -102,6 +95,8 @@ let
       "${id}(${label}):::${class}"
     else if kindOf unit == "oneshot" then
       "${id}[${label}]:::${class}"
+    else if kindOf unit == "shutdown" then
+      "${id}[/${label}\\]:::shutdown"
     else
       "${id}([${label}]):::${class}";
 
@@ -116,7 +111,9 @@ let
   # a unit which named no level. Nothing about where it is drawn changes - it hangs off
   # whatever it requires, like everything else - but it gets its own colour, because "no level
   # waits for this" is a fact about the graph rather than a decoration.
-  isFloating = name: unit: !(isLevel name) && levelOf name unit == null;
+  #
+  # Not a shutdown unit, which runs once everything has stopped and so has no level to name.
+  isFloating = name: unit: !(isLevel name) && !(unit.type ? shutdown) && levelOf name unit == null;
 
   # a user's tree, drawn beside the system's rather than in it.
   #
@@ -183,12 +180,14 @@ let
       # column of units rather than a row which grows off the side of the page
       "flowchart LR"
       "  %% hexagon: trunk level. rounded: service. square: oneshot. stadium: anchor."
+      "  %% trapezoid: shutdown, run once on the way down."
       "  %% red: attached to no level, so no level waits for it."
       "  classDef level fill:#111827,stroke:#6b7280,color:#f9fafb,stroke-width:2px"
       "  classDef service fill:#0b3b57,stroke:#3b9fd9,color:#e6f4ff"
       "  classDef oneshot fill:#2e2712,stroke:#a98520,color:#fdf3d8"
       "  classDef anchor fill:#1b2f22,stroke:#4f9e6a,color:#e8f7ee"
       "  classDef floating fill:#3b1219,stroke:#d2596e,color:#ffe4e9"
+      "  classDef shutdown fill:#2a1b3d,stroke:#8b6cc4,color:#efe7fb"
       ""
     ]
 

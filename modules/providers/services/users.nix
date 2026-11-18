@@ -560,6 +560,29 @@ in
           is already up before any session begins.
         '';
       }
+
+      # a user's supervisor ends with their session, not with the machine, and has no shutdown
+      # script to run - so a shutdown unit in a user's tree is one nothing would ever run
+      (
+        let
+          steps = lib.concatLists (
+            lib.mapAttrsToList (
+              user: u:
+              map (name: "providers.services.users.${user}.units.${name}") (
+                lib.attrNames (lib.filterAttrs (_: unit: unit.type ? shutdown) u.units)
+              )
+            ) cfg.users
+          );
+        in
+        {
+          assertion = steps == [ ];
+          message = ''
+            A user's tree cannot hold shutdown units, which run once on the way down - a user's
+            supervisor ends with their session and has nothing to run them from:
+            ${lib.concatStringsSep "\n" steps}
+          '';
+        }
+      )
     ];
   };
 }

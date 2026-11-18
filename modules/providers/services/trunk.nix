@@ -32,8 +32,6 @@ let
     in
     lib.findFirst (i: i != null) null hits;
 
-  latchIndex = indexOf cfg.latch;
-
   # the units which attached themselves to a level, found by reading the graph backwards. this
   # is what makes the chain advance: a level is not reached until everything at the previous
   # level is up, exactly as a runlevel is not entered until the previous one has finished.
@@ -60,10 +58,7 @@ let
       type = "anchor";
       description = "trunk level ${level}";
 
-      # the latch is the one level the graph cannot derive. it means "every unit before it has
-      # stopped", which is not a fact about starting and so has no edge to hang on - the backend
-      # supplies it, by emitting the latch where its init system signals shutdown.
-      requires = if i == 0 || i == latchIndex then [ ] else [ previous ] ++ dependants previous;
+      requires = if i == 0 then [ ] else [ previous ] ++ dependants previous;
     };
 in
 {
@@ -76,8 +71,6 @@ in
         "basic"
         "multi-user"
         "running"
-        "stopped"
-        "shutdown"
       ];
       description = ''
         The trunk, in order. Each entry becomes an `anchor` unit requiring the previous level
@@ -89,9 +82,6 @@ in
         because nothing has happened yet - and the last boot level, `running`, marks the whole
         userspace being up and has nothing attached to it.
 
-        Levels at or after {option}`latch` are the shutdown sequence: they cannot be reached
-        while the system is running, so units attached to them run on the way down.
-
         ::: {.note}
         A level becomes a unit name in the selected backend, so it must not collide with a
         name that backend reserves. `boot` is unusable for this reason: it is `dinit`'s own
@@ -100,19 +90,6 @@ in
       '';
     };
 
-    latch = lib.mkOption {
-      type = lib.types.str;
-      default = "stopped";
-      description = ''
-        The one level which does not resolve during normal operation.
-
-        Everything before it is the boot sequence. The latch itself is reached only once every
-        unit before it has stopped, which only happens when the system is going down - so
-        everything after it is the shutdown sequence, ordered by the same chain, and a unit
-        which needs to run on the way out attaches to a level after the latch rather than
-        needing a concept of its own.
-      '';
-    };
   };
 
   config = {
@@ -121,14 +98,6 @@ in
     );
 
     assertions = [
-      {
-        assertion = lib.elem cfg.latch cfg.levels;
-        message = ''
-          providers.services.trunk.latch is set to "${cfg.latch}", which is not one of the
-          trunk levels: ${lib.concatStringsSep ", " cfg.levels}
-        '';
-      }
-
       {
         assertion = cfg.levels == lib.unique cfg.levels;
         message = ''

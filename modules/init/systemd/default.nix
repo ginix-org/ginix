@@ -32,8 +32,6 @@ let
   trunk = cfg.trunk;
   scfg = config.systemd;
 
-  enabled = lib.filterAttrs (_: u: u.enable) cfg.units;
-
   kindOf = unit: lib.head (lib.attrNames unit.type);
   variantOf = unit: unit.type.${kindOf unit};
   readinessOf = unit: lib.head (lib.attrNames (variantOf unit).readiness);
@@ -48,10 +46,9 @@ let
   readinessLib = import ../../providers/services/readiness.nix { inherit pkgs lib; };
   shutdownLib = import ../../providers/services/shutdown.nix { inherit pkgs lib; };
 
-  onShutdownSide = shutdownLib.onShutdownSide trunk;
-  bootSide = lib.filterAttrs (n: u: !(onShutdownSide n u)) enabled;
+  bootSide = shutdownLib.bootSideOf cfg.units;
 
-  # the whole shutdown side as one script, in trunk order. The contract lowers it here for
+  # the shutdown units as one script, in dependency order. The contract lowers it here for
   # every backend because no init orders it reliably - see providers/services/shutdown.nix.
   #
   # systemd is the one init that could have ordered it itself, through units with
@@ -80,14 +77,13 @@ let
   unitOf = name: unit: "${prefix}${name}.${suffixOf unit}";
 
   # an edge, resolved against the scope the unit lives in. Scoped rather than always against
-  # `enabled` because a user's tree is a graph of its own and its units are not in `enabled` at
+  # `bootSide` because a user's tree is a graph of its own and its units are not in `bootSide` at
   # all - the same trap the dinit backend documents at `edgeIn`.
   unitIn =
     scope: name: if scope ? ${name} then unitOf name scope.${name} else "${prefix}${name}.service";
 
   rootTarget = "${prefix}default.target";
   latchService = "${prefix}shutdown.service";
-  firstLevel = lib.head trunk.levels;
 
   # ---- rendering ---------------------------------------------------------------------
 
@@ -122,12 +118,7 @@ let
   # *explicitly* stopped does propagate.
   depsOf =
     scope: name: unit:
-    map (unitIn scope) unit.requires
-
-    # the latch, hung where dinit hangs it and for the same reason. It has to stop after
-    # everything else, stop order is the reverse of start order, so it has to start before
-    # everything else - and the first trunk level is what everything is transitively behind.
-    ++ lib.optional (name == firstLevel && shutdownScript != null) latchService;
+    map (unitIn scope) unit.requires;
 
   unitSection =
     scope: name: unit:
@@ -263,19 +254,26 @@ let
     unitSection scope name unit
     + lib.optionalString (kindOf unit != "anchor") ("\n" + serviceSection name unit);
 
-  # the latch: a unit which does nothing on the way up and runs the shutdown side on the way
+  # the roots of the system's graph, which the latch is ordered before. It has to stop after
+  # everything else, stop order is the reverse of start order, and every unit is transitively
+  # behind some root - so ordering it before each root orders it before everything. Said on the
+  # latch rather than on the roots, so that rendering a unit does not have to know which tree
+  # it is in: a user's tree is not pid 1's to order.
+  roots = lib.mapAttrsToList unitOf (lib.filterAttrs (_: u: u.requires == [ ]) bootSide);
+
+  # the latch: a unit which does nothing on the way up and runs the shutdown units on the way
   # down. `ExecStop=` rather than a unit per step, because the script is already ordered.
   #
   # `DefaultDependencies=no` with an explicit `Before=`/`Conflicts=shutdown.target` is the
   # documented shape for something that must run during shutdown. With the default dependencies
-  # it would also be ordered `After=basic.target`, and so stopped before the units attached to
-  # the trunk rather than after them.
+  # it would also be ordered `After=basic.target`, and so stopped before the units it has to
+  # outlast rather than after them.
   latchText = ''
     [Unit]
     Description=finix shutdown sequence
     DefaultDependencies=no
     Conflicts=shutdown.target
-    Before=shutdown.target
+    Before=shutdown.target ${lib.concatStringsSep " " roots}
 
     [Service]
     Type=oneshot

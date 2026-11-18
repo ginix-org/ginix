@@ -7,10 +7,10 @@
 #      the dependency stopping. that is the contract's start-only edge, and on finit it has
 #      to be faked with a companion latch task. does it hold here?
 #
-#   2. the shutdown side. dinit has no runlevels, so the latch cannot be a unit which simply
-#      does not exist while the system runs. instead every post-latch unit starts as a no-op
-#      and does its work in `stop-command`, with the chain wired backwards so that dinit's
-#      reverse-order teardown replays it forwards. does the order come out right?
+#   2. the shutdown units. dinit has no runlevels, so they cannot be services which simply do
+#      not exist while the system runs. instead they are one script, the stop-command of a
+#      latch service every root of the graph depends on - so it starts first and stops last.
+#      does it hold?
 {
   name = "providers.services-dinit";
 
@@ -43,8 +43,6 @@
         "basic"
         "multi-user"
         "running"
-        "stopped"
-        "shutdown"
       ];
 
       providers.services.units = {
@@ -74,17 +72,16 @@
           requires = [ "basic" ];
         };
 
-        # shutdown side, at two different trunk positions so their order is unambiguous
+        # two shutdown units, the second requiring the first so their order is unambiguous
         late = {
-          requires = [ "stopped" ];
-          type.oneshot.command = pkgs.writeShellScript "late" ''
+          type.shutdown.command = pkgs.writeShellScript "late" ''
             echo "DINIT-SHUTDOWN-1-late" > /dev/console
           '';
         };
 
         later = {
-          requires = [ "shutdown" ];
-          type.oneshot.command = pkgs.writeShellScript "later" ''
+          requires = [ "late" ];
+          type.shutdown.command = pkgs.writeShellScript "later" ''
             echo "DINIT-SHUTDOWN-2-later" > /dev/console
           '';
         };
@@ -114,10 +111,11 @@
             machine.wait_until_succeeds(f"dinitctl status {svc} | grep -q 'State: STARTED'")
             machine.succeed(f"test -f /run/svc-test/{svc}.running")
 
-    with subtest("the shutdown side is up but has not done its work"):
-        # post-latch units start as no-ops; their real work is in stop-command
-        for svc in ["stopped", "late", "later", "shutdown"]:
-            machine.succeed(f"dinitctl status {svc} | grep -q 'State: STARTED'")
+    with subtest("the latch is up, and the shutdown units are not services at all"):
+        # the shutdown units are steps in the latch's stop-command, not services of their own
+        machine.succeed("dinitctl status providers-services-shutdown | grep -q 'State: STARTED'")
+        for svc in ["late", "later"]:
+            machine.fail(f"dinitctl status {svc}")
 
     # question 1: is depends-ms genuinely a start-only edge?
 

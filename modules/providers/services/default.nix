@@ -48,6 +48,8 @@ let
   # the same waiting a service's `waitFor` readiness does, handed to modules as commands
   readinessLib = import ./readiness.nix { inherit pkgs lib; };
 
+  shutdownLib = import ./shutdown.nix { inherit pkgs lib; };
+
   # what a unit's `type` says for a service, or nothing for a kind which has no such field.
   # The lifecycle options live on the kinds with a process, so a question about one is asked of
   # the variant rather than of the unit.
@@ -1001,6 +1003,22 @@ in
                         description = "A unit with no process at all.";
                         type = lib.types.submodule { };
                       };
+
+                      shutdown = lib.mkOption {
+                        description = ''
+                          A command run once, on the way down, after every other unit has
+                          stopped.
+
+                          Not a process anything supervises: the shutdown units are lowered into
+                          a single script, in the order their {option}`requires` give, and the
+                          implementation runs that script at the one point it reliably reaches
+                          on the way down. So `requires` here means "after these, in that
+                          script", and may name only other shutdown units.
+                        '';
+                        type = lib.types.submodule {
+                          options = { inherit command; };
+                        };
+                      };
                     }
                   );
               };
@@ -1017,7 +1035,12 @@ in
                 # the trunk's own levels are excluded: a level derives its own requires from
                 # the chain, and defaulting it to the head would make the first level require
                 # itself
-                default = lib.optional (!(lib.elem name cfg.trunk.levels)) (lib.head cfg.trunk.levels);
+                #
+                # nor is a shutdown unit, whose edges order the shutdown script and so may only
+                # name other shutdown units
+                default = lib.optional (!(lib.elem name cfg.trunk.levels) && !(config.type ? shutdown)) (
+                  lib.head cfg.trunk.levels
+                );
                 defaultText = lib.literalExpression "[ (lib.head config.providers.services.trunk.levels) ]";
                 description = ''
                   The units which must be ready before this one starts. Losing one afterwards
@@ -1354,6 +1377,37 @@ in
         '';
       }
     ) (lib.filterAttrs (name: _: !(lib.elem name cfg.trunk.levels)) cfg.units)
+
+    # the two sides of the graph never meet. A shutdown unit's edges order the shutdown script,
+    # which runs once everything else has stopped, so an edge from one to a boot unit names
+    # something long gone; and a boot unit waiting on a shutdown unit waits for something that
+    # only happens on the way down, which is forever.
+    ++ lib.mapAttrsToList (
+      name: unit:
+      let
+        mine = shutdownLib.isShutdown unit;
+        crossing = lib.filter (
+          dep: cfg.units ? ${dep} && shutdownLib.isShutdown cfg.units.${dep} != mine
+        ) unit.requires;
+      in
+      {
+        assertion = crossing == [ ];
+        message =
+          if mine then
+            ''
+              providers.services.units.${name} is a shutdown unit, and requires units which are
+              not: ${lib.concatStringsSep ", " crossing}
+
+              A shutdown unit runs after every other unit has stopped, so its `requires` order
+              it among the other shutdown units and can name nothing else.
+            ''
+          else
+            ''
+              providers.services.units.${name} requires shutdown units, which only run on the
+              way down: ${lib.concatStringsSep ", " crossing}
+            '';
+      }
+    ) cfg.units
 
     # a readiness kind the implementation cannot observe is refused rather than warned about,
     # which is what supportedFeatures.readiness has always said would happen. Every other

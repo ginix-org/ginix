@@ -129,22 +129,26 @@ in
           requires = [ "join" ];
         };
 
-        # the shutdown side: two units on the latch level and one on the level after it. The
-        # pair are siblings, so nothing orders them against each other - but both must have
-        # finished before the next level runs, and that is what the last one reports.
+        # the shutdown units: a pair which are siblings, so nothing orders them against each
+        # other, and one requiring both - which must not run until both have finished, and
+        # reports whether they had.
+        #
+        # The last is named to sort *before* the pair, because the shutdown script breaks ties
+        # by name: in the other order the edges could be ignored and this would still pass.
         down-a1 = {
-          requires = [ "stopped" ];
-          type.oneshot.command = downStep "down-a1" 2;
+          type.shutdown.command = downStep "down-a1" 2;
         };
 
         down-a2 = {
-          requires = [ "stopped" ];
-          type.oneshot.command = downStep "down-a2" 2;
+          type.shutdown.command = downStep "down-a2" 2;
         };
 
-        down-last = {
-          requires = [ "shutdown" ];
-          type.oneshot.command = pkgs.writeShellScript "stress-down-last" ''
+        down-0-last = {
+          requires = [
+            "down-a1"
+            "down-a2"
+          ];
+          type.shutdown.command = pkgs.writeShellScript "stress-down-last" ''
             ${sleep} 1
             seen=0
             for m in down-a1 down-a2; do

@@ -21,7 +21,6 @@
 }:
 let
   cfg = config.providers.services;
-  enabled = lib.filterAttrs (_: u: u.enable) cfg.units;
 
   kindOf = unit: lib.head (lib.attrNames unit.type);
   variantOf = unit: unit.type.${kindOf unit};
@@ -33,27 +32,12 @@ let
   shutdownLib = import ../../providers/services/shutdown.nix { inherit pkgs lib; };
 
   # runit has no runlevels and no notion of a unit which is not to start yet: every directory in
-  # the scan directory gets a runsv and is started at once. So a shutdown-side unit left in
-  # there does not wait for the latch - it runs during boot, which is not late, it is wrong.
+  # the scan directory gets a runsv and is started at once. So a shutdown unit left in there
+  # would run during boot, which is not late, it is wrong.
   #
   # They are kept out of the scan directory entirely and run from stage 3 instead, which is the
   # script runit executes as PID 1 on the way down.
-  bootSide = lib.filterAttrs (name: unit: !(shutdownLib.onShutdownSide cfg.trunk name unit)) enabled;
-  shutdownSide = lib.filterAttrs (name: unit: shutdownLib.onShutdownSide cfg.trunk name unit) enabled;
-
-  # the shutdown side is part of the generation but not part of the supervised set: it is not
-  # in the scan directory, because runit starts everything it finds there at boot.
-  #
-  # `list` reports it anyway, with the fingerprint this generation was built from. It is not
-  # running - it never is, until the machine goes down - but it is also not something the
-  # engine can start. Reporting nothing would leave it in the incoming tree and out of the
-  # current one, so every switch would resolve to "start the shutdown side", forever. Reported
-  # as already matching, the engine correctly finds nothing to do.
-  reportShutdownSide = lib.concatStrings (
-    lib.mapAttrsToList (
-      name: _: "printf '%s\\t%s\\n' ${name} ${lib.escapeShellArg cfg.switch.fingerprints.${name}}\n"
-    ) shutdownSide
-  );
+  bootSide = shutdownLib.bootSideOf cfg.units;
 
   shutdownScript = shutdownLib.scriptFor cfg;
 
@@ -539,11 +523,9 @@ in
           exec ${lib.getExe' pkgs.runit "runsvdir"} -P ${systemScanDir}
         '';
 
-        # stage 3. runit has already stopped the supervisor by the time this runs; the contract's
-        # shutdown-side units are the graph's business, not runit's.
         # stage 3, which runit runs as PID 1 once the supervisor is gone - so the boot-side
         # services have already been stopped by the time this executes. That is the one point
-        # runit reaches on the way down, and so where the contract's shutdown side belongs; it is
+        # runit reaches on the way down, and so where the contract's shutdown units belong; it is
         # also why those units are excluded from the scan directory above, since anything left
         # there would have been started at boot instead.
         "runit/3".source = pkgs.writeShellScript "runit-stage-3" ''
@@ -560,7 +542,6 @@ in
 
       providers.services.switch = {
         list = pkgs.writeShellScript "runit-list" ''
-          ${reportShutdownSide}
           for dir in ${systemScanDir}/*; do
             [ -d "$dir" ] || continue
             unit=$(${lib.getExe' pkgs.coreutils "basename"} "$dir")
@@ -590,8 +571,8 @@ in
             # Only the files this backend generates are replaced, never the whole directory:
             # `supervise` belongs to a running runsv, and removing it out from under one loses
             # the process it is supervising.
-            # a unit the engine names but this backend does not manage - the shutdown side, which
-            # is kept out of the scan directory because runit would otherwise start it at boot
+            # a unit the engine names but this backend does not have - one already gone, or one
+            # this generation has no directory for
             if [ ! -d ${serviceDir}/"$unit" ] && [ ! -d ${systemScanDir}/"$unit" ]; then
               continue
             fi

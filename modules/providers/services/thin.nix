@@ -40,7 +40,8 @@ rec {
   manifestFor =
     cfg:
     let
-      enabled = lib.filterAttrs (_: u: u.enable) cfg.units;
+      # a shutdown unit has no job: it is a step in `shutdown_command`, and nothing else
+      enabled = shutdownLib.bootSideOf cfg.units;
 
       unitJson =
         name: unit:
@@ -67,8 +68,6 @@ rec {
           # null means `fork` readiness - up the moment it is running. `notify` and `s6` never
           # reach here; the contract refuses them against these backends.
           readiness_command = if kind == "service" then readinessLib.scriptFor name v.readiness else null;
-
-          shutdown_side = shutdownLib.onShutdownSide cfg.trunk name unit;
         };
     in
     pkgs.writeText "finix-rc-manifest.json" (

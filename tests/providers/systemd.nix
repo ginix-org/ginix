@@ -124,17 +124,16 @@
           '';
         };
 
-        # the shutdown side, at two trunk positions so their order is unambiguous.
+        # two shutdown units, the second requiring the first so their order is unambiguous.
         late = {
-          requires = [ "stopped" ];
-          type.oneshot.command = pkgs.writeShellScript "late" ''
+          type.shutdown.command = pkgs.writeShellScript "late" ''
             echo "SYSTEMD-SHUTDOWN-1-late" > /dev/console
           '';
         };
 
         later = {
-          requires = [ "shutdown" ];
-          type.oneshot.command = pkgs.writeShellScript "later" ''
+          requires = [ "late" ];
+          type.shutdown.command = pkgs.writeShellScript "later" ''
             echo "SYSTEMD-SHUTDOWN-2-later" > /dev/console
           '';
         };

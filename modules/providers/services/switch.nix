@@ -105,7 +105,10 @@ let
     lib.concatMapStringsSep "\n" (name: "${name}\t${fingerprintOf enabled.${name}}") order
   );
 
-  enabled = lib.filterAttrs (_: u: u.enable) cfg.units;
+  # the units a switch reconciles: the boot side, which is everything with a process. A shutdown
+  # unit is a step in a script run on the way down, so there is nothing running to compare it
+  # against and nothing a switch could start - it changes with the generation and that is all.
+  enabled = (import ./shutdown.nix { inherit pkgs lib; }).bootSideOf cfg.units;
 
   # the units which said they can re-read their own configuration, and the commands which make
   # them do it. Two files rather than one, because the engine wants the names sorted for

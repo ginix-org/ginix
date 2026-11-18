@@ -7,11 +7,11 @@
 # running - which is not a test failure but a hang, since a driver waiting for a VM that will
 # never stop waits forever.
 #
-# The second is the shutdown side of the graph. A level at or after the latch cannot be reached
-# while the system is up, so a unit attached to one runs only on the way down; two of them in
-# sequence say the sequence runs to its end rather than being cut off partway by the power
-# going. Both report over /dev/console, because by then /run is going away and the driver's own
-# shell is among the things being stopped.
+# The second is the shutdown units. A `shutdown` unit is never started while the system is up,
+# and runs only on the way down, after everything else has stopped; two of them, one requiring
+# the other, say the sequence runs to its end and in order rather than being cut off partway by
+# the power going. Both report over /dev/console, because by then /run is going away and the
+# driver's own shell is among the things being stopped.
 {
   pkgs,
   lib,
@@ -49,21 +49,21 @@ in
           requires = [ "sysinit" ];
         };
 
-        # the two attach to different levels, which is what orders them. Attaching both to
-        # `stopped` would make them siblings with no edge between them, and nothing in the
-        # contract would say which ran first - finit would order them anyway, because it
-        # collapses the shutdown side into one script, and dinit would not.
+        # the second requires the first, which is what orders them. Without the edge they would
+        # be siblings, and nothing in the contract would say which ran first.
         first-down = {
-          requires = [ "stopped" ];
-          type.oneshot.command = step "first-down" "CORE-SHUTDOWN-ONE";
+          type.shutdown.command = step "first-down" "CORE-SHUTDOWN-ONE";
         };
 
         # reports whether the earlier step had already run, rather than relying on the order
         # two console lines happen to be read in. This is the ordering claim itself: the marker
-        # can only be there if the level before this one was reached first.
-        then-down = {
-          requires = [ "shutdown" ];
-          type.oneshot.command = pkgs.writeShellScript "shutdown-then-down" ''
+        # can only be there if the step this one requires ran first.
+        #
+        # Named to sort *before* `first-down`, because the shutdown script breaks ties by name:
+        # in the other order the edge could be ignored entirely and this would still pass.
+        after-first-down = {
+          requires = [ "first-down" ];
+          type.shutdown.command = pkgs.writeShellScript "shutdown-then-down" ''
             if [ -e ${coreLib.markerDir}/first-down.ran ]; then
               echo "CORE-SHUTDOWN-TWO after-one" > /dev/console
             else
@@ -85,9 +85,8 @@ in
     with subtest("the machine is up, with its boot-side daemon running"):
         machine.wait_until_succeeds("pgrep -f '[f]inix-daemon-running-daemon'", timeout=60)
 
-    with subtest("the shutdown side has not run while the system is up"):
-        # the latch is the one level the graph cannot reach on its own: if these had run
-        # already, the level would mean nothing and a shutdown unit would be an ordinary one
+    with subtest("the shutdown units have not run while the system is up"):
+        # if these had run already, a shutdown unit would be an ordinary oneshot
         machine.fail("test -e ${coreLib.markerDir}/first-down.ran")
         machine.fail("test -e ${coreLib.markerDir}/then-down.ran")
 

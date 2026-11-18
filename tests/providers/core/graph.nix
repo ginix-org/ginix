@@ -51,8 +51,7 @@ let
 
         # and one on the way down
         on-the-way-out = {
-          requires = [ "stopped" ];
-          type.oneshot.command = "/bin/out";
+          type.shutdown.command = "/bin/out";
         };
       };
     };
@@ -91,12 +90,8 @@ let
       why = "a unit which named no level is coloured for it, since no level waits for it";
     }
     {
-      line = "  u_stopped{{\"stopped<br/>level · latch\"}}:::level";
-      why = "the latch says so, because the graph falls in two there and that is not a mistake";
-    }
-    {
-      line = "  u_on_the_way_out[\"on-the-way-out<br/>oneshot\"]:::oneshot";
-      why = "the shutdown side is drawn too - it is part of the configuration";
+      line = "  u_on_the_way_out[/\"on-the-way-out<br/>shutdown\"\\]:::shutdown";
+      why = "a shutdown unit is drawn as one, and not as floating: it runs once everything has stopped, so it has no level to name";
     }
   ];
 
@@ -104,10 +99,6 @@ let
     {
       line = "subgraph";
       why = "the graph is drawn as it is - units, and the edges between them - with nothing boxed, grouped or collapsed";
-    }
-    {
-      line = "--> u_stopped";
-      why = "nothing leads to the latch: it means everything has stopped, which is not a fact about starting";
     }
   ];
 

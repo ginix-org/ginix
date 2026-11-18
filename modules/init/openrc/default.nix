@@ -24,7 +24,6 @@
 }:
 let
   cfg = config.providers.services;
-  enabled = lib.filterAttrs (_: u: u.enable) cfg.units;
 
   kindOf = unit: lib.head (lib.attrNames unit.type);
   variantOf = unit: unit.type.${kindOf unit};
@@ -35,32 +34,18 @@ let
 
   shutdownLib = import ../../providers/services/shutdown.nix { inherit pkgs lib; };
 
-  bootSide = lib.filterAttrs (name: unit: !(shutdownLib.onShutdownSide cfg.trunk name unit)) enabled;
-  shutdownSide = lib.filterAttrs (name: unit: shutdownLib.onShutdownSide cfg.trunk name unit) enabled;
+  bootSide = shutdownLib.bootSideOf cfg.units;
 
-  # the shutdown side is part of the generation but not part of the runlevel: a service in
-  # `default` is one openrc starts at boot, which is the one thing a unit on this side must
-  # never do. It is lowered to a single script instead, in trunk order, and handed to the one
+  # a shutdown unit is part of the generation but not part of the runlevel: a service in
+  # `default` is one openrc starts at boot, which is the one thing a shutdown unit must never
+  # do. They are lowered to a single script instead, in dependency order, and handed to the one
   # point openrc reaches reliably on the way down.
   #
   # That point is the `shutdown` runlevel. openrc-init runs `openrc shutdown` before it sends
   # the final TERM, and changing runlevel stops what the old one held before starting what the
   # new one does - so by the time this runs, everything it is supposed to come after has
-  # stopped. Which is exactly what the latch means.
+  # stopped. Which is exactly what a shutdown unit is promised.
   shutdownScript = shutdownLib.scriptFor cfg;
-
-  # `list` reports the shutdown side anyway, with the fingerprint this generation was built
-  # from. It is not running - it never is, until the machine goes down - but it is also not
-  # something the engine can start. Reporting nothing leaves it in the incoming tree and out of
-  # the current one, so every switch resolves to "start the shutdown side", forever, against
-  # services which are not in /etc/init.d at all: `starting: ... stopped ifupdown-ng-down
-  # shutdown` on a switch that changed none of them. Reported as already matching, the engine
-  # correctly finds nothing to do.
-  reportShutdownSide = lib.concatStrings (
-    lib.mapAttrsToList (
-      name: _: "printf '%s\\t%s\\n' ${name} ${lib.escapeShellArg cfg.switch.fingerprints.${name}}\n"
-    ) shutdownSide
-  );
 
   openrc = config.openrc.package;
 
@@ -82,8 +67,8 @@ let
   # which is what `need` says. `after` is ordering without a requirement, so a unit whose
   # dependency failed would start regardless.
   #
-  # An edge naming a unit this backend does not emit - the shutdown side - would make openrc
-  # refuse the service outright, so those are dropped rather than left dangling.
+  # An edge naming a unit this backend does not emit would make openrc refuse the service
+  # outright, so those are dropped rather than left dangling.
   dependsOf =
     unit:
     let
@@ -213,13 +198,13 @@ let
     ''
   );
 
-  # not a unit, and deliberately not named like one: the whole shutdown side is one script, and
+  # not a unit, and deliberately not named like one: the shutdown units are one script, and
   # this is the runscript which carries it into the `shutdown` runlevel. It has no `depend` -
   # there is nothing left to depend on by the time it runs.
   shutdownRunscript = pkgs.writeScript "openrc-providers-services-shutdown" ''
     #!${openrc}/bin/openrc-run
 
-    description='the shutdown side of the trunk, in order'
+    description='the shutdown units, in order'
 
     depend() {
       :
@@ -394,7 +379,7 @@ in
               else
                 printf '%s\tstopped\n' ${lib.escapeShellArg name}
               fi
-            '') (lib.filterAttrs (_: u: u.enable) cfg.units)
+            '') bootSide
           )
         )
       );
@@ -416,7 +401,6 @@ in
             ]
           }:$PATH
 
-          ${reportShutdownSide}
           [ -d /run/openrc/started ] || exit 0
 
           for path in /run/openrc/started/*; do

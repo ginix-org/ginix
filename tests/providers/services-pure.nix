@@ -73,7 +73,7 @@
             "ifupdown-ng", "keventd", "backdoor", "syslogd",
         }
         contract = {
-            "start", "sysinit", "basic", "multi-user", "running", "stopped", "shutdown",
+            "start", "sysinit", "basic", "multi-user", "running",
             "mdevd", "mdevd-started", "coldplug", "marker",
             "providers-services-shutdown",
             # emitted by the contract now, not by finit: putting volatile files in place and

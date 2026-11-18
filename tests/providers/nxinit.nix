@@ -64,18 +64,18 @@
           requires = [ "basic" ];
         };
 
-        # the shutdown side, at two trunk positions so their order is unambiguous. Reaching
-        # these at all means rcshutdown was spawned rather than reboot(2) called directly.
+        # two shutdown units, the second requiring the first so their order is unambiguous.
+        # Reaching these at all means rcshutdown was spawned rather than reboot(2) called
+        # directly.
         late = {
-          requires = [ "stopped" ];
-          type.oneshot.command = pkgs.writeShellScript "late" ''
+          type.shutdown.command = pkgs.writeShellScript "late" ''
             echo "NXINIT-SHUTDOWN-1-late" > /dev/console
           '';
         };
 
         later = {
-          requires = [ "shutdown" ];
-          type.oneshot.command = pkgs.writeShellScript "later" ''
+          requires = [ "late" ];
+          type.shutdown.command = pkgs.writeShellScript "later" ''
             echo "NXINIT-SHUTDOWN-2-later" > /dev/console
           '';
         };
