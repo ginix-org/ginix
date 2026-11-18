@@ -23,11 +23,22 @@
 {
   lib,
   pkgs,
-  mkTest,
   ...
 }:
 let
-  testLib = import ../lib { inherit lib pkgs; };
+  # its own nixpkgs, which will evaluate unfree packages. These machines are built and booted,
+  # and a module whose package is unfree - 1password - is as much a module as any other: refused
+  # by the default nixpkgs, it raised while its derivation was being computed, which nothing
+  # here could catch, and took the listing of every test in the repository down with it.
+  bootPkgs = import pkgs.path {
+    inherit (pkgs.stdenv.hostPlatform) system;
+    config.allowUnfree = true;
+  };
+
+  testLib = import ../lib {
+    inherit lib;
+    pkgs = bootPkgs;
+  };
   coreLib = import ../providers/core/lib.nix { inherit pkgs lib; };
 
   backends = [
@@ -190,7 +201,15 @@ let
   attempt =
     kind: name: backend:
     let
-      r = builtins.tryEval (mkTest (test kind name backend));
+      # the derivation path forced inside the tryEval, not only the test: a module which cannot be
+      # evaluated here fails while that path is computed, and left lazy that happened wherever it
+      # was first asked for - the test listing, which then failed as a whole
+      r = builtins.tryEval (
+        let
+          t = testLib.mkTest (test kind name backend);
+        in
+        builtins.seq t.drvPath t
+      );
     in
     if r.success then
       r.value

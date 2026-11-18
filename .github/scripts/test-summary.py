@@ -14,6 +14,13 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 ANSI = re.compile(r"\x1b\[[0-?]*[ -/]*[@-~]")
+# Every VM test a pull request runs, one job each: the provider suites, the top-level tests and
+# tests/modules-vm. Not tests/modules-boot, which boots every module on every implementation -
+# some seven hundred machines, past both the 256 jobs a matrix may have and what one evaluation
+# of them all fits in on a runner - and not tests/modules, which is evaluation rather than VMs
+# and runs as a job of its own. Both stay `nix-build tests -A ...` away.
+SKIPPED_SUITES = ('modules', 'modules-boot')
+
 DISCOVER = r'''
 let
   walk = path: value:
@@ -24,8 +31,8 @@ let
         (name: walk (path ++ [name]) (builtins.getAttr name value))
         (builtins.attrNames value))
     else [];
-in walk [] (import ./tests {})
-'''
+in walk [] (builtins.removeAttrs (import ./tests {}) [ SKIPPED ])
+'''.replace('SKIPPED', ' '.join(f'"{s}"' for s in SKIPPED_SUITES))
 
 
 def list_tests():
