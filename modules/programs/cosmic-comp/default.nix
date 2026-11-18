@@ -75,8 +75,13 @@ in
     ]
     ++ lib.optionals cfg.xwayland.enable [ pkgs.xwayland ];
 
-    finit.tmpfiles.rules = lib.optionals cfg.xwayland.enable [
-      "d /tmp/.X11-unix 1777 root root -"
+    # the contract's rule rather than finit's, so the X socket directory exists on every
+    # implementation and not only the one which reads tmpfiles.d(5)
+    providers.services.tmpfiles.rules = lib.optionals cfg.xwayland.enable [
+      {
+        path = "/tmp/.X11-unix";
+        type.directory.mode = "1777";
+      }
     ];
   };
 }

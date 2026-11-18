@@ -20,7 +20,23 @@
   ...
 }:
 let
-  testLib = import ../lib { inherit lib pkgs; };
+  # its own nixpkgs, which will evaluate unfree packages and ones with no build for this
+  # platform. Nothing here is built - the question is whether a module uses the contract
+  # correctly - so a licence or a missing aarch64 port is not a failure of the module, and
+  # without this nzbget (unrar), 1password, virtualbox and thermald read as broken on any
+  # machine that is not an unfree-enabled x86_64 one.
+  evalPkgs = import pkgs.path {
+    inherit (pkgs.stdenv.hostPlatform) system;
+    config = {
+      allowUnfree = true;
+      allowUnsupportedSystem = true;
+    };
+  };
+
+  testLib = import ../lib {
+    inherit lib;
+    pkgs = evalPkgs;
+  };
 
   backends = [
     "finit"
@@ -276,12 +292,23 @@ let
     kind: name:
     hasEnableAt (testLib.evalNode "machine" (nodeFor "services" "getty" "finit")).options kind name;
 
+  # modules whose package cannot be evaluated at all on this platform - not a licence or a
+  # missing port, which evalPkgs allows, but a package set which does not exist here, such as
+  # the i686 one virtualbox builds against on anything but x86
+  platformOnly = lib.optionalAttrs (!pkgs.stdenv.hostPlatform.isx86) {
+    virtualbox = "its package needs the i686 package set";
+  };
+
   checksFor =
     kind:
     lib.listToAttrs (
       map (
         name: lib.nameValuePair name (lib.recurseIntoAttrs (lib.genAttrs backends (check kind name)))
-      ) (lib.filter (name: optional kind name && !(needsConfiguration ? ${name})) (modulesIn kind))
+      ) (
+        lib.filter (
+          name: optional kind name && !(needsConfiguration ? ${name}) && !(platformOnly ? ${name})
+        ) (modulesIn kind)
+      )
     );
 in
 {

@@ -347,6 +347,19 @@ in
       environment.etc."init.d".source = initd;
       environment.etc."runlevels".source = runlevels;
 
+      # services started together, as the contract's graph says: a unit starts once what it
+      # requires is ready, and is not held behind a unit it has nothing to do with.
+      #
+      # openrc's default is one service at a time, in dependency order - which is the same
+      # ordering only for units that never wait. A oneshot whose command is a wait, holding its
+      # dependants until a device or a file appears, held up everything after it in openrc's
+      # sequence instead, including the unit which was going to make the file: openrc never got
+      # to start it, so the wait ran to its timeout every time. tests/providers/core/readiness
+      # is that case.
+      environment.etc."rc.conf".text = ''
+        rc_parallel="YES"
+      '';
+
       environment.systemPackages = [ openrc ];
 
       # openrc records what it has started as files under /run/openrc/started, which is what

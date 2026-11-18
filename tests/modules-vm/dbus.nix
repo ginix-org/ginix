@@ -87,7 +87,9 @@ in
     machine.start()
 
     with subtest("userspace comes up and the bus is answering"):
-        machine.wait_until_succeeds("test -e ${coreLib.bootedMarker}", timeout=90)
+        # the marker waits for every unit on the machine, and under emulation - a builder without
+        # /dev/kvm - ninety seconds was enough most of the time and not always
+        machine.wait_until_succeeds("test -e ${coreLib.bootedMarker}", timeout=300)
         machine.succeed("test -S /run/dbus/system_bus_socket")
 
     with subtest("and it never failed to bind on the way there"):

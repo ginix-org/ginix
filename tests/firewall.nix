@@ -83,7 +83,9 @@
         client.fail("ncat -z -w 3 192.168.1.2 8081")
 
     with subtest("nixos-firewall-tool: detects the nftables backend"):
-        nftables.succeed("nixos-firewall-tool show | grep -q 'table inet nixos-fw'")
+        # not `grep -q`: it exits on the first match, the tool still writing gets SIGPIPE, and
+        # under pipefail that fails the check - whenever the match came early enough
+        nftables.succeed("nixos-firewall-tool show | grep 'table inet nixos-fw' >/dev/null")
 
     with subtest("nixos-firewall-tool: opens a port at runtime"):
         nftables.succeed("nixos-firewall-tool open tcp 8081")

@@ -65,6 +65,17 @@ let
 
   edgeTo = edgeIn enabled;
 
+  # a unit's start timeout as dinit takes it: the contract's number where there is one, and 0 -
+  # dinit for unlimited - where there is not, since an unset `startTimeout` is no bound at all
+  # and dinit's own default is sixty seconds. A slow `tmpfiles-setup` was cancelled by it, and
+  # everything behind it failed.
+  startTimeoutOf =
+    unit:
+    let
+      t = (variantOf unit).startTimeout or null;
+    in
+    if t == null then 0 else t;
+
   typeOf =
     unit:
     if kindOf unit == "oneshot" then
@@ -156,8 +167,11 @@ let
     // lib.optionalAttrs (waitKindOf unit == "pidfile") {
       pid-file = (variantOf unit).readiness.waitFor.pidfile.file;
     }
-    // lib.optionalAttrs ((variantOf unit).startTimeout or null != null) {
-      start-timeout = (variantOf unit).startTimeout;
+    # always said, because dinit's own default is sixty seconds and the contract's is no bound at
+    # all: an unset `startTimeout` means the same on every implementation. 0 is dinit for
+    # unlimited.
+    // {
+      start-timeout = startTimeoutOf unit;
     }
     // lib.optionalAttrs ((variantOf unit).stopTimeout or null != null) {
       stop-timeout = (variantOf unit).stopTimeout;
@@ -290,6 +304,8 @@ let
         source = settingsFormat.generate (waitNameOf name) {
           type = "scripted";
           command = "${readinessLib.scriptFor name (variantOf unit).readiness}";
+          # the wait is the service starting, so whatever bounds the service bounds this
+          start-timeout = startTimeoutOf unit;
           depends-ms = [ name ];
         };
       }
@@ -473,6 +489,8 @@ in
             # command is a string. scriptFor hands back a derivation for every waitFor kind bar
             # `check`, where it is the command the configuration supplied.
             command = "${readinessLib.scriptFor name (variantOf unit).readiness}";
+            # the wait is the service starting, so whatever bounds the service bounds this
+            start-timeout = startTimeoutOf unit;
             depends-ms = [ name ];
             default = true;
           }

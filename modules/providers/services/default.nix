@@ -715,7 +715,8 @@ in
                       default = null;
                       description = ''
                         How long, in seconds, this unit may take to become ready before it is
-                        considered failed.
+                        considered failed. `null` is no bound at all, on every implementation -
+                        including the ones with a default of their own, which is overridden.
 
                         For a service, subject to
                         {option}`providers.services.supportedFeatures.startTimeout`. For a

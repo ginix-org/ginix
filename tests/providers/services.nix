@@ -22,6 +22,7 @@
       daemon =
         name:
         pkgs.writeShellScript "${name}-daemon" ''
+          export PATH=${pkgs.coreutils}/bin:$PATH
           mkdir -p /run/svc-test
           trap 'rm -f /run/svc-test/${name}.running; exit 0' TERM
           touch /run/svc-test/${name}.running
@@ -33,12 +34,17 @@
       marker =
         name:
         pkgs.writeShellScript "${name}-marker" ''
+          export PATH=${pkgs.coreutils}/bin:$PATH
           mkdir -p /run/svc-test
           echo "${name} ran" > /run/svc-test/${name}.ran
         '';
     in
     {
       imports = [ ../lib/contract-base.nix ];
+
+      # finit's own `initctl`, whose JSON this test reads, rather than the front-end over every
+      # implementation which would otherwise be installed in front of it
+      providers.services.ctl.enable = false;
 
       providers.services.units = {
         # requires nothing, so it runs as soon as the boot does

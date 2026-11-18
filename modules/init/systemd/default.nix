@@ -228,7 +228,11 @@ let
       # wrapper to get a per-unit PATH; systemd has the directive.
       ++ lib.optional (unit.path != [ ]) "Environment=${envValue "PATH=${lib.makeBinPath unit.path}"}"
       ++ lib.mapAttrsToList (k: v': "Environment=${envValue "${k}=${toString v'}"}") unit.environment
-      ++ lib.optional (v.startTimeout or null != null) "TimeoutStartSec=${toString v.startTimeout}"
+      # always said, because systemd's own default is ninety seconds and an unset `startTimeout`
+      # is no bound at all, the same as on every other implementation
+      ++ [
+        "TimeoutStartSec=${if v.startTimeout or null == null then "infinity" else toString v.startTimeout}"
+      ]
       ++ lib.optional (v.stopTimeout or null != null) "TimeoutStopSec=${toString v.stopTimeout}"
 
       # where a unit's own account of itself goes, which has to be said because the usual answer

@@ -36,6 +36,10 @@
     {
       imports = [ ../lib/contract-base.nix ];
 
+      # finit's own `initctl`, whose JSON this test reads, rather than the front-end over every
+      # implementation which would otherwise be installed in front of it
+      providers.services.ctl.enable = false;
+
       environment.systemPackages = [
         pg
         pkgs.curl
