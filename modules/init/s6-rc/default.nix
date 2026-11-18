@@ -114,7 +114,8 @@ let
   # socket is still there, so the check above would not catch it. Both syslog modules call it
   # `syslogd`. And not a unit which takes the terminal: `logger` is a child of the unit's own
   # process, and that is exactly what `terminal` says must not happen - see it in the contract.
-  logsToSyslog = name: unit: kindOf unit != "anchor" && !unit.terminal && name != "syslogd";
+  logsToSyslog =
+    name: unit: kindOf unit != "anchor" && !((variantOf unit).terminal or false) && name != "syslogd";
 
   logger = lib.getExe' pkgs.util-linux "logger";
 
@@ -215,11 +216,11 @@ let
             printf '%s\n' ${runScript name unit} > $out/source/${name}/up
           ''
       )
-      + lib.optionalString (unit.startTimeout != null) ''
-        printf '%d\n' ${toString (unit.startTimeout * 1000)} > $out/source/${name}/timeout-up
+      + lib.optionalString ((variantOf unit).startTimeout or null != null) ''
+        printf '%d\n' ${toString ((variantOf unit).startTimeout * 1000)} > $out/source/${name}/timeout-up
       ''
-      + lib.optionalString (unit.stopTimeout != null) ''
-        printf '%d\n' ${toString (unit.stopTimeout * 1000)} > $out/source/${name}/timeout-down
+      + lib.optionalString ((variantOf unit).stopTimeout or null != null) ''
+        printf '%d\n' ${toString ((variantOf unit).stopTimeout * 1000)} > $out/source/${name}/timeout-down
       '';
 
   # the whole point of this backend: the database is built here, not assembled at boot. a

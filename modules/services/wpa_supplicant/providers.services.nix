@@ -37,7 +37,7 @@ in
 
       # read from the store path named in the command, so a changed configuration is already a
       # changed unit; this is for the reload below rather than for the restart
-      reloadTriggers = lib.optional (cfg.interfaces != [ ]) cfg.configFile;
+      type.service.reloadTriggers = lib.optional (cfg.interfaces != [ ]) cfg.configFile;
 
       type.service = {
         inherit command;

@@ -30,7 +30,7 @@ in
       # What this gives up is that the greeter keeps running with the definition it started from
       # until something restarts it - a reboot, or `initctl restart greetd` by someone who meant
       # it. That is the right trade for a unit whose restart is a logout.
-      restartIfChanged = false;
+      type.service.restartIfChanged = false;
 
       # `multi-user`, like any other login prompt: a greeter before the system is up offers a
       # session into a half-built machine. `runlevels = "34"` had no contract equivalent - the

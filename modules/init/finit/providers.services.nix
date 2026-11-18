@@ -196,7 +196,7 @@ let
       # Except for a unit which takes the terminal for its own output, where `logit` is worse
       # than useless: it is a child of the unit's process, which `login` later inherits and
       # mistakes for the shell. See `terminal` in the contract.
-      log = if unit.terminal then null else { };
+      log = if (variantOf unit).terminal or false then null else { };
 
       # finit notices a changed unit by its stanza file changing, so stamping each unit's
       # fingerprint into its own file guarantees the file differs whenever the unit's definition
@@ -260,7 +260,7 @@ let
       type = "forking";
       pidfile = svc.readiness.waitFor.pidfile.file;
     }
-    // lib.optionalAttrs (unit.stopTimeout != null) { stop-timeout = unit.stopTimeout; };
+    // lib.optionalAttrs (svc.stopTimeout != null) { stop-timeout = svc.stopTimeout; };
 
   mkTask =
     name: unit:

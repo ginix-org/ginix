@@ -36,7 +36,7 @@ in
       # from is listed: a changed keymap is then a changed unit. It has a `reload` below,
       # so that is a re-read rather than a restart - which matters here, since restarting
       # keyd drops the grabs on every keyboard.
-      reloadTriggers = lib.mapAttrsToList (_: v: v.source) cfg.configTree;
+      type.service.reloadTriggers = lib.mapAttrsToList (_: v: v.source) cfg.configTree;
 
       type.service = {
         command = "${cfg.package}/bin/keyd";

@@ -31,7 +31,7 @@ in
 
       # `kill = 10` becomes the contract's stopTimeout, which every implementation bounds
       # except runit - and says so.
-      stopTimeout = lib.mkDefault 10;
+      type.service.stopTimeout = lib.mkDefault 10;
 
       # uptime-kuma runs ping by name for its monitors
       path = [ pkgs.unixtools.ping ];

@@ -53,7 +53,7 @@ in
       ];
 
       # a database flushing its buffer pool on the way out is the case this option exists for
-      stopTimeout = 120;
+      type.service.stopTimeout = 120;
 
       type.service = {
         command = "${cfg.package}/bin/mysqld --defaults-file=/etc/my.cnf ${mysqldOptions}";

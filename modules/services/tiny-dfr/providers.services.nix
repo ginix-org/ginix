@@ -28,7 +28,7 @@ in
       # The config file is read at startup only, so a changed one means a restart. Named as a
       # reload trigger rather than left implicit: the command does not mention the file, so
       # nothing else would notice it changing.
-      reloadTriggers = [ config.environment.etc."tiny-dfr/config.toml".source ];
+      type.service.reloadTriggers = [ config.environment.etc."tiny-dfr/config.toml".source ];
     };
   };
 }

@@ -239,8 +239,8 @@ let
       # wrapper to get a per-unit PATH; systemd has the directive.
       ++ lib.optional (unit.path != [ ]) "Environment=${envValue "PATH=${lib.makeBinPath unit.path}"}"
       ++ lib.mapAttrsToList (k: v': "Environment=${envValue "${k}=${toString v'}"}") unit.environment
-      ++ lib.optional (unit.startTimeout != null) "TimeoutStartSec=${toString unit.startTimeout}"
-      ++ lib.optional (unit.stopTimeout != null) "TimeoutStopSec=${toString unit.stopTimeout}"
+      ++ lib.optional (v.startTimeout or null != null) "TimeoutStartSec=${toString v.startTimeout}"
+      ++ lib.optional (v.stopTimeout or null != null) "TimeoutStopSec=${toString v.stopTimeout}"
 
       # where a unit's own account of itself goes, which has to be said because the usual answer
       # is not here.

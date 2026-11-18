@@ -7,6 +7,16 @@
 let
   cfg = config.providers.services;
 
+  # the options on a kind which say how a switch treats the unit, or how long it is given,
+  # rather than what it runs.
+  lifecycle = [
+    "terminal"
+    "restartIfChanged"
+    "reloadTriggers"
+    "startTimeout"
+    "stopTimeout"
+  ];
+
   # what makes a unit "the same unit, changed" rather than a different one. taken over the
   # contract's own definition, so it means the same thing on every init system - a backend
   # altering how it emits a unit does not by itself count as the unit having changed.
@@ -16,27 +26,37 @@ let
   # compares two numbers it produced itself, and never needs to know how an init stores things.
   fingerprintOf =
     unit:
+    let
+      kind = lib.head (lib.attrNames unit.type);
+      variant = unit.type.${kind};
+    in
     builtins.substring 0 16 (
       builtins.hashString "sha256" (
         builtins.toJSON (
           {
-            # `type` now carries the command and readiness of whichever kind this is, so it
-            # covers on its own what three separate fields used to
+            # `type` carries the command and readiness of whichever kind this is, so it covers
+            # on its own what three separate fields used to.
+            #
+            # Less the lifecycle options, which live on the kind too but are hashed below in
+            # the shape they had when they were the unit's own - so that moving them changed no
+            # fingerprint, and the first switch across that move restarted nothing. `terminal`
+            # and `restartIfChanged` were never part of it, and are not now.
+            type.${kind} = removeAttrs variant lifecycle;
+
             inherit (unit)
-              type
               user
               group
               environment
-              startTimeout
-              stopTimeout
               ;
+            startTimeout = variant.startTimeout or null;
+            stopTimeout = variant.stopTimeout or null;
             path = map toString unit.path;
 
             # the files the unit reads and does not name. Everything else here is something
             # the unit says about itself; this is the one thing it cannot, since a daemon
             # reading /etc/foo.conf at a fixed path leaves no trace of that in its own
             # definition. See the option for why that matters.
-            reloadTriggers = map toString unit.reloadTriggers;
+            reloadTriggers = map toString (variant.reloadTriggers or [ ]);
           }
 
           # an anchor's edges are deliberately not part of what it is.
@@ -95,7 +115,9 @@ let
   # units a switch may not interrupt just because their definition changed. See the option: a
   # display manager restarting is every session on the machine ending, including the one the
   # switch is being run from.
-  pinned = lib.filterAttrs (_: u: !u.restartIfChanged) enabled;
+  pinned = lib.filterAttrs (
+    _: u: !((u.type.${lib.head (lib.attrNames u.type)}).restartIfChanged or true)
+  ) enabled;
 
   pinnedNames = pkgs.writeText "services-pinned" (
     lib.concatMapStringsSep "\n" (n: n) (lib.sort (a: b: a < b) (lib.attrNames pinned)) + "\n"

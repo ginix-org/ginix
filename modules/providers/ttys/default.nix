@@ -180,7 +180,7 @@ in
 
         # whatever runs here opens the device and makes it its stdio, so its output is the
         # terminal's and not the log's - and capturing it anyway breaks every login
-        terminal = true;
+        type.service.terminal = true;
 
         type.service.command =
           if device.command != null then

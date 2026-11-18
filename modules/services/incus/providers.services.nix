@@ -22,7 +22,7 @@ in
 
       # a hypervisor being asked to stop has guests to stop first, and 30 seconds was finit's
       # figure for it
-      stopTimeout = 30;
+      type.service.stopTimeout = 30;
 
       type.service.command = pkgs.writeShellApplication {
         name = "incusd";

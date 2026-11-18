@@ -41,7 +41,7 @@ in
       # `kill = 120` was finit's; a database is the case the option was written for. A
       # checkpoint on shutdown can take minutes on a large cluster, and being killed part way
       # through one is how a cluster comes back needing recovery.
-      stopTimeout = 120;
+      type.service.stopTimeout = 120;
 
       type.service = {
         command = "${lib.getExe' cfg.package "postgres"} " + lib.escapeShellArgs cfg.extraArgs;

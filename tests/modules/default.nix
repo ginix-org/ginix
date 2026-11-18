@@ -114,7 +114,9 @@ let
             # survive rather than cause. The string is what matters here anyway: it is what
             # the fingerprint hashes.
             path = map toString u.path;
-            reloadTriggers = map toString u.reloadTriggers;
+            reloadTriggers = map toString (
+              u.type.service.reloadTriggers or u.type.oneshot.reloadTriggers or [ ]
+            );
           }) cfg.providers.services.units;
           messages = map (a: a.message) (lib.filter (a: !a.assertion) cfg.assertions);
         in

@@ -209,8 +209,12 @@ let
     // lib.optionalAttrs (waitKindOf unit == "pidfile") {
       pid-file = (variantOf unit).readiness.waitFor.pidfile.file;
     }
-    // lib.optionalAttrs (unit.startTimeout != null) { start-timeout = unit.startTimeout; }
-    // lib.optionalAttrs (unit.stopTimeout != null) { stop-timeout = unit.stopTimeout; }
+    // lib.optionalAttrs ((variantOf unit).startTimeout or null != null) {
+      start-timeout = (variantOf unit).startTimeout;
+    }
+    // lib.optionalAttrs ((variantOf unit).stopTimeout or null != null) {
+      stop-timeout = (variantOf unit).stopTimeout;
+    }
     # the first trunk level depends on the latch, so the latch is started before anything
     # else and therefore stopped after everything else - which is what makes it mean
     # "every unit before me has stopped"
@@ -238,7 +242,9 @@ let
     // lib.optionalAttrs (unit.name == latchName && shutdownScript != null) {
       stop-command = "${shutdownScript}";
     }
-    // lib.optionalAttrs (unit.stopTimeout != null) { stop-timeout = unit.stopTimeout; };
+    // lib.optionalAttrs ((variantOf unit).stopTimeout or null != null) {
+      stop-timeout = (variantOf unit).stopTimeout;
+    };
 
   # ---- the user role ----------------------------------------------------------------
   #

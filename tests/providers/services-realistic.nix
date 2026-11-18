@@ -86,7 +86,7 @@
           # finit calls it ready the moment it execs, long before it accepts connections.
           # that lie is what `pg-ready` below exists to correct.
           type.service.readiness = "fork";
-          stopTimeout = 120;
+          type.service.stopTimeout = 120;
           type.service.command = "${lib.getExe' pg "postgres"} -D ${dataDir} -k ${sock}";
         };
 

@@ -31,7 +31,7 @@ in
       # The daemon reads this from a fixed path, so without naming it here the
       # file could change while the unit stayed identical and lactd kept running
       # with what it started with.
-      reloadTriggers = lib.optional (
+      type.service.reloadTriggers = lib.optional (
         cfg.settings != { }
       ) config.environment.etc."lact/config.yaml".source;
     };
