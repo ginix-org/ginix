@@ -302,13 +302,12 @@ let
   checksFor =
     kind:
     lib.listToAttrs (
-      map (
-        name: lib.nameValuePair name (lib.recurseIntoAttrs (lib.genAttrs backends (check kind name)))
-      ) (
-        lib.filter (
-          name: optional kind name && !(needsConfiguration ? ${name}) && !(platformOnly ? ${name})
-        ) (modulesIn kind)
-      )
+      map (name: lib.nameValuePair name (lib.recurseIntoAttrs (lib.genAttrs backends (check kind name))))
+        (
+          lib.filter (
+            name: optional kind name && !(needsConfiguration ? ${name}) && !(platformOnly ? ${name})
+          ) (modulesIn kind)
+        )
     );
 in
 {
