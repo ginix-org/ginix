@@ -96,7 +96,7 @@ in
         # two branches of different depth and different timing, so neither finishing first is
         # a matter of which was declared first
         a1 = slow "a1" 2 // {
-          requires = [ "sysinit" ];
+          requires = [ "tmpfiles-setup" ];
         };
         a2 = slow "a2" 1 // {
           requires = [ "a1" ];
@@ -106,7 +106,7 @@ in
         };
 
         b1 = slow "b1" 3 // {
-          requires = [ "sysinit" ];
+          requires = [ "tmpfiles-setup" ];
         };
         b2 = slow "b2" 1 // {
           requires = [ "b1" ];
@@ -196,8 +196,8 @@ in
         machine.wait_for_console_text("STRESS-DOWN down-a1")
         machine.wait_for_console_text("STRESS-DOWN down-a2")
 
-        # the claim that orders them: the later level ran only once both units attached to the
-        # earlier one had finished, and says so itself rather than leaving it to be inferred
+        # the claim that orders them: the last step ran only once both steps it requires
+        # had finished, and says so itself rather than leaving it to be inferred
         # from the order two console lines were read in
         machine.wait_for_console_text("STRESS-DOWN-LAST saw:2")
 

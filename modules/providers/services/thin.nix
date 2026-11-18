@@ -34,7 +34,7 @@ rec {
 
   # everything Nix resolves, as one file.
   #
-  # `requires` is already flattened - every trunk edge and every explicit `requires` - so nothing
+  # `requires` is already exactly the edges, as written - so nothing
   # at boot searches or orders anything. That is the property the measurement which chose these
   # backends depends on, and moving from generated shell to generated JSON does not touch it.
   manifestFor =
@@ -53,7 +53,7 @@ rec {
           fingerprint = cfg.switch.fingerprints.${name};
           requires = unit.requires;
           inherit kind;
-          command = v.command or null;
+          inherit (v) command;
           user = unit.user;
           group = unit.group;
 

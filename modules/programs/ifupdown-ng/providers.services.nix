@@ -17,8 +17,9 @@ in
     providers.services.units.ifupdown-ng = {
       description = "bring up network interfaces";
 
-      # `sysinit` puts it in the basic tier, where syslogd is already behind it - which is what
-      # the old `service/syslogd/ready` condition said and no longer needs saying.
+      # the logger - which is what the old `service/syslogd/ready` condition said - its state,
+      # and the firewall where there is one: an interface coming up is the machine becoming
+      # reachable, which it should not be before its ruleset is loaded.
       #
       # The device manager's settle is named outright, because this is one of the few things
       # that genuinely wants the global property rather than a device. Interfaces are renamed by
@@ -28,11 +29,13 @@ in
       # up an interface under a name that is about to change is a configuration applied to
       # nothing.
       requires = [
-        "sysinit"
+        "tmpfiles-setup"
       ]
-      ++ lib.optional config.services.udev.enable "udev-settle"
-      ++ lib.optional config.services.mdevd.enable "coldplug"
-      ++ lib.optional config.services.gardendevd.enable "gardendevd-settle";
+      ++ config.providers.services.lib.present [
+        "syslogd"
+        "nftables"
+        "devices-settled"
+      ];
 
       type.oneshot.command = pkgs.writeShellScript "ifup" ''
         ${lib.concatMapStrings (iface: ''
@@ -40,8 +43,8 @@ in
           # portable form of the same question is whether the kernel has made the directory.
           #
           # Bounded, and deliberately: an unsatisfied finit condition meant the task simply
-          # never ran and the boot carried on, but a unit attached to a tier is something the
-          # tier waits for - so an unbounded wait for a NIC which is not present would stall
+          # never ran and the boot carried on, but a unit is something whatever requires it waits
+          # for - so an unbounded wait for a NIC which is not present would stall
           # the boot rather than skip the interface.
           for _ in $(${lib.getExe' pkgs.coreutils "seq"} 1 100); do
             [ -d /sys/class/net/${iface} ] && break

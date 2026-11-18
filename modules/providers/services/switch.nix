@@ -32,47 +32,35 @@ let
     in
     builtins.substring 0 16 (
       builtins.hashString "sha256" (
-        builtins.toJSON (
-          {
-            # `type` carries the command and readiness of whichever kind this is, so it covers
-            # on its own what three separate fields used to.
-            #
-            # Less the lifecycle options, which live on the kind too but are hashed below in
-            # the shape they had when they were the unit's own - so that moving them changed no
-            # fingerprint, and the first switch across that move restarted nothing. `terminal`
-            # and `restartIfChanged` were never part of it, and are not now.
-            type.${kind} = removeAttrs variant lifecycle;
-
-            inherit (unit)
-              user
-              group
-              environment
-              ;
-            startTimeout = variant.startTimeout or null;
-            stopTimeout = variant.stopTimeout or null;
-            path = map toString unit.path;
-
-            # the files the unit reads and does not name. Everything else here is something
-            # the unit says about itself; this is the one thing it cannot, since a daemon
-            # reading /etc/foo.conf at a fixed path leaves no trace of that in its own
-            # definition. See the option for why that matters.
-            reloadTriggers = map toString (variant.reloadTriggers or [ ]);
-          }
-
-          # an anchor's edges are deliberately not part of what it is.
+        builtins.toJSON ({
+          # `type` carries the command and readiness of whichever kind this is, so it covers
+          # on its own what three separate fields used to.
           #
-          # A trunk level requires the level before it and everything attached to that level,
-          # so adding or removing any unit anywhere changes the `requires` of every level
-          # downstream of it. Were that in the fingerprint, one new unit would mark half the
-          # trunk as changed and the engine would stop and restart it - which accomplishes
-          # nothing, because an anchor has no process to restart, and on s6-rc is destructive:
-          # dependencies there are hard, so bringing a level down brings down everything above
-          # it, including the units the switch was supposed to leave alone.
-          #
-          # What an anchor is, is its existence. Added or removed it is started or stopped;
-          # otherwise there is nothing about it to change.
-          // lib.optionalAttrs (!(unit.type ? anchor)) { inherit (unit) requires; }
-        )
+          # Less the lifecycle options, which live on the kind too but are hashed below in
+          # the shape they had when they were the unit's own - so that moving them changed no
+          # fingerprint, and the first switch across that move restarted nothing. `terminal`
+          # and `restartIfChanged` were never part of it, and are not now.
+          type.${kind} = removeAttrs variant lifecycle;
+
+          inherit (unit)
+            user
+            group
+            environment
+            ;
+          startTimeout = variant.startTimeout or null;
+          stopTimeout = variant.stopTimeout or null;
+          path = map toString unit.path;
+
+          # the files the unit reads and does not name. Everything else here is something
+          # the unit says about itself; this is the one thing it cannot, since a daemon
+          # reading /etc/foo.conf at a fixed path leaves no trace of that in its own
+          # definition. See the option for why that matters.
+          reloadTriggers = map toString (variant.reloadTriggers or [ ]);
+
+          # what it waits for is part of what it is: the same command started after something
+          # else is a different unit
+          inherit (unit) requires;
+        })
       )
     );
 

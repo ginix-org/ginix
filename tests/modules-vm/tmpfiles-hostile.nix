@@ -23,12 +23,14 @@ in
       services.dbus.enable = true;
       services.iwd.enable = true;
 
-      providers.services.units.booted = coreLib.bootedUnit;
+      providers.services.units.booted = coreLib.bootedUnit config.providers.services.units;
 
-      # runs before tmpfiles-setup, and makes the world hostile
+      providers.services.units.tmpfiles-setup.requires = [ "hostile-state" ];
+
+      # runs before tmpfiles-setup - which is made to require it - and makes the world hostile
       providers.services.units.hostile-state = {
         description = "leave the kind of mess a previous install leaves";
-        requires = [ (lib.head config.providers.services.trunk.levels) ];
+        requires = config.providers.services.lib.present [ "mount-filesystems" ];
 
         type.oneshot.command = pkgs.writeShellScript "hostile-state" ''
           export PATH=${

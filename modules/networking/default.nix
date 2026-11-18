@@ -121,8 +121,8 @@ in
     # ran without them.
     #
     # Bounded at five seconds and not thirty, which is what it was first written as. Nothing in
-    # the trunk is exempt from being waited for: this attaches to `sysinit`, so `basic` waits
-    # for it, and so does every level above - which meant that on a machine with no default
+    # the boot was exempt from being waited for: this sat in an early tier, so the next waited
+    # for it, and so did everything after - which meant that on a machine with no default
     # route, and that includes every test VM, the console appeared half a minute after the
     # machine was otherwise up. Five seconds covers a DHCP lease on a network which is there;
     # a daemon whose network arrives later has to cope with that anyway, since nothing

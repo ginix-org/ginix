@@ -33,10 +33,17 @@ in
     providers.services.units.polkit = {
       description = "policykit authorization manager";
 
-      # nothing about sessiond: the session and seat managers are in the tier before this one,
-      # so anything here is after them. Naming one would also have made it an optional edge,
-      # which is the shape that hides a requirement rather than stating it.
-      requires = [ "basic" ];
+      # the bus, the logger, and whichever of the session trackers this machine has: polkit
+      # answers "is this an active local session", which it asks of them.
+      requires = [
+        "tmpfiles-setup"
+      ]
+      ++ config.providers.services.lib.present [
+        "dbus"
+        "syslogd"
+        "elogind"
+        "sessiond"
+      ];
 
       type.service.command =
         "${cfg.package.out}/lib/polkit-1/polkitd --no-debug "

@@ -11,7 +11,7 @@ in
   name = "modules.micolash-${backend}";
 
   nodes.machine =
-    { modules, ... }:
+    { config, modules, ... }:
     {
       imports =
         with modules;
@@ -60,7 +60,7 @@ in
       programs.xwayland-satellite.enable = true;
       programs.gnome-keyring.enable = true;
 
-      providers.services.units.booted = coreLib.bootedUnit;
+      providers.services.units.booted = coreLib.bootedUnit config.providers.services.units;
       providers.services.tmpfiles.rules = lib.mkMerge [
         [
           {

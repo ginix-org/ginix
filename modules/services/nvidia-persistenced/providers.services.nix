@@ -20,7 +20,7 @@ in
       inherit (cfg) user group;
 
       description = "NVIDIA persistence daemon";
-      requires = [ "basic" ];
+      requires = [ "tmpfiles-setup" ] ++ config.providers.services.lib.present [ "syslogd" ];
 
       type.service = {
         command = "${lib.getExe cfg.package} " + lib.escapeShellArgs cfg.extraArgs;

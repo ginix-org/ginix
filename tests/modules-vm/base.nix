@@ -25,12 +25,12 @@
   # a device manager, which every one of these needs and none of them has to describe
   services.mdevd.enable = true;
 
-  # a terminal, because finix asserts one exists when finit is PID 1. Unattached to the trunk:
+  # a terminal, because finix asserts one exists when finit is PID 1. Attached to nothing:
   # nothing here is testing login prompts, and a test whose machine stalls should still offer a
   # console to look at.
-  services.getty.enable = false;
-  providers.ttys.devices.tty1 = {
-    description = "getty on /dev/tty1";
-    requires = [ ];
+  services.getty = {
+    enable = true;
+    ttys = [ "tty1" ];
   };
+  providers.services.units.tty-tty1.requires = [ ];
 }

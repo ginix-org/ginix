@@ -96,8 +96,8 @@ let
     latchDir: unit:
     lib.concatMapStrings (dep: readinessLib.waitForPath (latch latchDir dep)) unit.requires;
 
-  # a unit runit considers "up" must not exit, or runsv restarts it forever. anchors and
-  # completed oneshots therefore park rather than return.
+  # a unit runit considers "up" must not exit, or runsv restarts it forever. completed
+  # oneshots therefore park rather than return.
   park = "exec ${sleep} infinity";
 
   # runit does not drop privileges itself; `chpst` ships with it for exactly this. without it
@@ -125,12 +125,7 @@ let
         ${waitFor latchDir unit}
       ''
       + (
-        if kind == "anchor" then
-          ''
-            ${touch} ${latch latchDir name}
-            ${park}
-          ''
-        else if kind == "oneshot" then
+        if kind == "oneshot" then
           ''
             ${asUser unit}${v.command}
             ${touch} ${latch latchDir name}
@@ -411,7 +406,7 @@ in
         user: _:
         lib.nameValuePair "user-services-dir--${user}" {
           description = "service directory for ${user}";
-          requires = [ "sysinit" ];
+          requires = [ "tmpfiles-setup" ];
           type.oneshot.command = pkgs.writeShellScript "user-services-dir-${user}" ''
             ${mkdir} -p ${userRoot user}
             ${lib.getExe' pkgs.coreutils "chown"} ${user} ${userRoot user}

@@ -15,27 +15,31 @@
       description = "apply the configured hostname";
       type.oneshot.command = "${lib.getExe' pkgs.nettools "hostname"} -F /etc/hostname";
 
-      # early, so that anything logging or announcing itself later says the right name
-      requires = [ (lib.head config.providers.services.trunk.levels) ];
+      # requires nothing, so it starts with the boot. Anything which logs or announces the
+      # name - the logger, mDNS - names this unit.
     };
 
     providers.services.units.network-online = {
       description = "wait for a default route";
 
-      # the multi-user tier, which is where the things that make a route are.
+      # after whichever of the things that make a route this machine has, since a wait which
+      # starts before them cannot observe what it is waiting for.
       #
-      # It was attached to `sysinit`, one tier ahead of dhcpcd and iwd - so it ran before
-      # anything had tried to bring a link up, could only pass on a machine which already had a
-      # route, and on a wireless one spent its whole five seconds and gave up every boot. That
-      # made it two things at once: a wait which could not observe what it was waiting for, and
-      # five seconds in front of `basic`, which is in front of `multi-user`, which is what a
-      # login prompt and a compositor wait for. A machine with no route took five seconds
+      # It once ran a tier ahead of dhcpcd and iwd - so it ran before anything had tried to bring
+      # a link up, could only pass on a machine which already had a route, and on a wireless one
+      # spent its whole five seconds and gave up every boot. That made it two things at once: a
+      # wait which could not observe what it was waiting for, and five seconds in front of
+      # everything later, including a login prompt. A machine with no route took five seconds
       # longer to show anybody anything, for a check that had already failed.
       #
-      # Here it starts beside the daemons which configure the network rather than ahead of
-      # them, and the only thing behind it is `running` - so a unit which genuinely needs a
-      # route still waits, and nothing which merely needs a session does.
-      requires = [ "multi-user" ];
+      # Nothing waits for it unless it says so, so a unit which genuinely needs a route still
+      # waits, and nothing which merely needs a session does.
+      requires = config.providers.services.lib.present [
+        "ifupdown-ng"
+        "dhcpcd"
+        "network-manager"
+        "iwd"
+      ];
 
       type.oneshot.command = pkgs.writeShellScript "network-online" ''
         for _ in $(${lib.getExe' pkgs.coreutils "seq"} 1 50); do

@@ -18,7 +18,7 @@ in
       inherit (cfg) user group;
 
       description = "vnStat network traffic monitor";
-      requires = [ "basic" ];
+      requires = [ "tmpfiles-setup" ] ++ config.providers.services.lib.present [ "syslogd" ];
 
       # read from a fixed path and named nowhere else, so a changed configuration
       # would otherwise leave the daemon running with the old one

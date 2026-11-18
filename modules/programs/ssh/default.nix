@@ -354,9 +354,8 @@ in
         units.ssh-agent = {
           description = "ssh authentication agent";
 
-          # nothing: the agent needs no part of the system to be up, and the default is the
-          # first trunk level, which is a *system* unit and not something a user's tree can
-          # wait for.
+          # nothing: the agent needs no part of the system to be up, and a user's tree cannot
+          # wait for a system unit anyway.
           requires = [ ];
 
           type.service = {

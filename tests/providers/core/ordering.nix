@@ -27,7 +27,7 @@ in
       providers.services.units = {
         first = {
           type.service.command = coreLib.recorder "first";
-          requires = [ "sysinit" ];
+          requires = [ "tmpfiles-setup" ];
         };
 
         second = {

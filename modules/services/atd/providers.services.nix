@@ -16,7 +16,7 @@ in
   config = lib.mkIf cfg.enable {
     providers.services.units.atd = {
       description = "deferred execution scheduler";
-      requires = [ "basic" ];
+      requires = [ "tmpfiles-setup" ] ++ config.providers.services.lib.present [ "syslogd" ];
 
       type.service = {
         # `-f` is foreground, so ready-on-fork is the only honest answer. `notify = "pid"`

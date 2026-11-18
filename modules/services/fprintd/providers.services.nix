@@ -18,8 +18,12 @@ in
       description = "fingerprint authentication daemon";
 
       requires = [
-        "basic"
+        "tmpfiles-setup"
         "polkit"
+      ]
+      ++ config.providers.services.lib.present [
+        "dbus"
+        "syslogd"
       ];
 
       type.service.command = "${cfg.package}/libexec/fprintd --no-timeout";

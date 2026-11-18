@@ -81,7 +81,7 @@ pub fn activate(manifest: &Manifest, manifest_path: &str) -> ExitCode {
 ///
 /// It is deliberately never removed here. See `activate`, which is where clearing it is safe.
 ///
-/// An anchor or oneshot has no pidfile, never having been supervised, so there is nothing to
+/// A oneshot has no pidfile, never having been supervised, so there is nothing to
 /// signal - only its latch and fingerprint to take back.
 pub fn deactivate(manifest: &Manifest) -> ExitCode {
     let latches = Latches::new(&manifest.latch_dir);

@@ -26,7 +26,7 @@ let
       # in both generations, unchanged: nothing about it differs, so nothing should happen to it
       keeper = {
         type.service.command = coreLib.daemon "keeper";
-        requires = [ "sysinit" ];
+        requires = [ "tmpfiles-setup" ];
       };
     };
   };
@@ -41,7 +41,7 @@ let
       # and one which only exists there
       newcomer = {
         type.service.command = coreLib.daemon "newcomer";
-        requires = [ "sysinit" ];
+        requires = [ "tmpfiles-setup" ];
       };
     };
   };
@@ -65,7 +65,7 @@ in
 
       providers.services.units.goner = {
         type.service.command = coreLib.daemon "goner";
-        requires = [ "sysinit" ];
+        requires = [ "tmpfiles-setup" ];
       };
     };
 
@@ -115,7 +115,7 @@ in
             )
 
         with subtest("the machine is still up afterwards"):
-            # a switch which took the trunk down with it would still have passed everything above
+            # a switch which took the boot down with it would still have passed everything above
             machine.succeed("test -e ${coreLib.bootedMarker}")
 
         machine.shutdown()

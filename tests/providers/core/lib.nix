@@ -85,14 +85,16 @@ rec {
       exec ${sleep} infinity
     '';
 
-  # the portable "the system is up" gate. `running` is the last boot level and has nothing
-  # attached to it, so a unit which requires it runs once userspace is up - on every backend,
-  # without asking the supervisor anything.
+  # the portable "the system is up" gate: a unit requiring every other unit the machine starts,
+  # so it runs once all of them are ready - on every backend, without asking the supervisor
+  # anything. Given the machine's units, since what "every other" is depends on them.
   bootedMarker = "${markerDir}/booted";
 
-  bootedUnit = {
+  bootedUnit = units: {
     description = "userspace is up";
-    requires = [ "running" ];
+    requires = lib.attrNames (
+      lib.filterAttrs (name: unit: name != "booted" && unit.enable && !(unit.type ? shutdown)) units
+    );
     type.oneshot.command = pkgs.writeShellScript "booted" ''
       ${preamble}
       ${touch} ${bootedMarker}

@@ -45,7 +45,7 @@ in
             command = coreLib.slowDaemon "by-path" delay;
             readiness.waitFor.path.path = liveFile "by-path";
           };
-          requires = [ "sysinit" ];
+          requires = [ "tmpfiles-setup" ];
         };
 
         after-path = {
@@ -64,7 +64,7 @@ in
               done
             '';
           };
-          requires = [ "sysinit" ];
+          requires = [ "tmpfiles-setup" ];
         };
 
         after-check = {
@@ -76,7 +76,7 @@ in
         # so nothing orders it after the file appearing except the wait that is its command.
         by-device = {
           type.service.command = coreLib.slowDaemon "by-device" delay;
-          requires = [ "sysinit" ];
+          requires = [ "tmpfiles-setup" ];
         };
 
         device-gate = {
@@ -84,7 +84,7 @@ in
             command = config.providers.services.lib.waitFor.path (liveFile "by-device");
             startTimeout = 60;
           };
-          requires = [ "sysinit" ];
+          requires = [ "tmpfiles-setup" ];
         };
 
         after-gate = {

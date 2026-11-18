@@ -33,7 +33,7 @@ in
 
     description = ''
       Whether to mount the filesystems in {option}`fileSystems` which the initrd did not, as
-      the `mount-filesystems` unit at the head of the trunk.
+      the `mount-filesystems` unit, which requires nothing and so starts with the boot.
 
       An implementation which mounts them itself before any unit runs - finit reads
       `/etc/fstab` as part of being finit - can turn this off, though leaving it on is
@@ -45,10 +45,6 @@ in
     providers.services.units.mount-filesystems = {
       description = "mount the remaining filesystems";
       type.oneshot.command = "${lib.getExe' pkgs.util-linux "mount"} -a";
-
-      # the head of the trunk, so that everything attached to any later level is behind the
-      # filesystems it is going to want
-      requires = [ (lib.head cfg.trunk.levels) ];
     };
   };
 }

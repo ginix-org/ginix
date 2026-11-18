@@ -17,9 +17,17 @@ in
     providers.services.units.avahi-daemon = {
       description = "avahi daemon service";
 
-      # nothing about syslogd or the bus: both are in the head tier, with the bus's socket gate
-      # beside it, so anything here is after them
-      requires = [ "basic" ];
+      # the bus, the logger, and the firewall where there is one; and the hostname, which is
+      # what it announces
+      requires = [
+        "tmpfiles-setup"
+        "set-hostname"
+      ]
+      ++ config.providers.services.lib.present [
+        "dbus"
+        "syslogd"
+        "nftables"
+      ];
 
       # the daemon reads /etc/avahi/avahi-daemon.conf from a fixed path and names it
       # nowhere, so without this a changed configuration leaves it running with what it

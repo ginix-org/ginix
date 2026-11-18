@@ -2,8 +2,8 @@
 #
 # The provider suite proves the contract works. This proves the modules *use* it - which is a
 # different question, and the one that goes wrong quietly: a unit requiring a name nothing
-# defines, asking for a readiness its backend cannot observe, attaching to two trunk levels, or
-# forming a cycle. None of that needs a machine to detect. All of it is refused at evaluation,
+# defines, asking for a readiness its backend cannot observe, a boot unit waiting on a shutdown
+# one, or forming a cycle. None of that needs a machine to detect. All of it is refused at evaluation,
 # by assertions the contract already makes, and until now nothing forced that evaluation for
 # anything but the handful of modules the VM tests happen to enable.
 #
@@ -69,7 +69,16 @@ let
           # finix asserts a terminal exists when finit is PID 1, and a device manager is close
           # enough to universal that a machine without one is not the thing being tested here
           services.getty.enable = true;
-          services.mdevd.enable = true;
+          #
+          # but not when the row is another device manager: two of them on one machine handle every
+          # event twice, and both define `devices-settled`, which is a conflict about the test
+          # rather than about the module
+          services.mdevd.enable =
+            !(lib.elem name [
+              "udev"
+              "gardendevd"
+              "keventd"
+            ]);
         }
 
         # `setAttrByPath` rather than a literal: which option turns the module on is computed

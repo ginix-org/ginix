@@ -37,8 +37,8 @@ let
   #
   # That holds while the machine runs. It does not hold across a database update, and the
   # difference is worth writing down: s6-rc-update restarts a service which "has a dependency
-  # to [...] a new service that did not previously exist", so adding a unit low in the trunk
-  # restarts everything attached to the levels above it. The contract's model defines how
+  # to [...] a new service that did not previously exist", so adding a unit early in the graph
+  # restarts everything which requires it. The contract's model defines how
   # services are brought up, not that a switch moves the same set on every implementation, so
   # this is a property of s6-rc rather than a contract violation - but a machine switching
   # here bounces more than one switching on finit, dinit or runit does.
@@ -57,32 +57,12 @@ let
 
   shutdownScript = shutdownLib.scriptFor cfg;
 
-  # what the engine may be told to start and stop, and what `list` may report: the boot side,
-  # minus the anchors. An anchor is a bundle here, and a bundle is a compile-time name for a
-  # set - it has no state, so s6-rc will neither list it nor change it.
-  atomic = lib.filterAttrs (_: unit: kindOf unit != "anchor") bootSide;
-
-  # everything the switch knows of which s6-rc has no state for: the anchors, which are
-  # bundles.
-  #
-  # `list` reports them with the fingerprint this generation was built from. They are not
-  # running - an anchor never is - but neither can the engine start them. Reporting nothing
-  # would leave them in the incoming tree and out of the current one, so every switch would
-  # resolve to "start every level", forever. Reported as already matching, the engine finds
-  # nothing to do.
-  unmanaged = lib.filterAttrs (name: _: !(atomic ? ${name})) bootSide;
-
-  reportUnmanaged = lib.concatStrings (
-    lib.mapAttrsToList (
-      name: _: "printf '%s\\t%s\\n' ${name} ${lib.escapeShellArg cfg.switch.fingerprints.${name}}\n"
-    ) unmanaged
-  );
-
-  # the engine reconciles the whole incoming tree, which includes the anchors - which s6-rc
-  # cannot be asked about, being bundles. Naming one fails the entire change, taking the units
-  # which do exist down with it. Reads unit names on stdin and leaves the survivors in $units.
+  # the engine reconciles whatever it is handed, and s6-rc refuses a whole change which names
+  # a service its database does not have - taking the units which do exist down with it. A name
+  # can reach here which is not in this generation's database, one removed by the switch, so
+  # the names are checked first. Reads unit names on stdin and leaves the survivors in $units.
   knownFilter = ''
-    known=" ${lib.concatStringsSep " " (lib.attrNames atomic)} "
+    known=" ${lib.concatStringsSep " " (lib.attrNames bootSide)} "
     units=""
     while read -r unit; do
       case "$known" in
@@ -99,8 +79,8 @@ let
   # where on finit the same unit's output is in syslog. This puts it in the same place.
   #
   # Decided when the unit starts, by whether the socket is there, rather than at build time.
-  # The syslog daemon is attached to the head of the trunk, so the units in that same tier can
-  # start before it has made /dev/log, and `logger` with no socket does not fail: it carries on
+  # A unit which does not name the syslog daemon - or names nothing, and starts with the boot -
+  # can start before it has made /dev/log, and `logger` with no socket does not fail: it carries on
   # reading and drops every line. Those units would have lost their output entirely, at the
   # point in the boot where it is most likely to explain something. Without the socket, a unit
   # keeps the catch-all, which is no worse than before; with it, `logger` reconnects on its own
@@ -110,8 +90,7 @@ let
   # socket is still there, so the check above would not catch it. Both syslog modules call it
   # `syslogd`. And not a unit which takes the terminal: `logger` is a child of the unit's own
   # process, and that is exactly what `terminal` says must not happen - see it in the contract.
-  logsToSyslog =
-    name: unit: kindOf unit != "anchor" && !((variantOf unit).terminal or false) && name != "syslogd";
+  logsToSyslog = name: unit: !((variantOf unit).terminal or false) && name != "syslogd";
 
   logger = lib.getExe' pkgs.util-linux "logger";
 
@@ -163,61 +142,43 @@ let
     let
       kind = kindOf unit;
     in
-    if kind == "anchor" then
-      # an anchor is a name for a set rather than something which runs, and that is precisely
-      # what an s6-rc bundle is. As a oneshot running `true` it had state, and s6-rc-update
-      # then felt obliged to reconcile it: a trunk level's edges change whenever any unit is
-      # added or removed anywhere, so every switch found the level's definition changed,
-      # restarted it, and - dependencies here being hard - brought down everything above it.
-      # One added unit restarted the machine.
-      #
-      # A bundle has no state, so changing its contents restarts nothing. Depending on one is
-      # depending on all of its members, which is exactly what "this level has been reached"
-      # means. Bundles cannot have dependencies of their own, so what would have been the
-      # anchor's `requires` becomes its contents - the same set, said the other way round.
-      ''
-        mkdir -p $out/source/${name}
-        printf 'bundle\n' > $out/source/${name}/type
-        printf '%s' ${lib.escapeShellArg (dependencies unit)} > $out/source/${name}/contents
-      ''
-    else
-      ''
-        mkdir -p $out/source/${name}
-        printf '%s\n' ${if kind == "service" then "longrun" else "oneshot"} > $out/source/${name}/type
-        printf '%s' ${lib.escapeShellArg (dependencies unit)} > $out/source/${name}/dependencies
-      ''
-      + (
-        # a longrun's `run` is an executable the supervisor execs, but a oneshot's `up` is an
-        # execline command line which s6-rc-compile reads as text - so one is linked in and the
-        # other is written out. linking a binary in as `up` makes s6-rc try to parse an ELF
-        # header as a command.
-        if kind == "service" then
-          ''
-            ln -s ${runScript name unit} $out/source/${name}/run
-          ''
-          # `fork` means no notification at all: s6 calls it up once spawned. `s6` is the daemon
-          # notifying for itself, and `waitFor` is the wrapper in the run script notifying on its
-          # behalf - both arrive on the same descriptor, so both are declared the same way.
-          +
-            lib.optionalString
-              (lib.elem (readinessOf unit) [
-                "s6"
-                "waitFor"
-              ])
-              ''
-                printf '3\n' > $out/source/${name}/notification-fd
-              ''
-        else
-          ''
-            printf '%s\n' ${runScript name unit} > $out/source/${name}/up
-          ''
-      )
-      + lib.optionalString ((variantOf unit).startTimeout or null != null) ''
-        printf '%d\n' ${toString ((variantOf unit).startTimeout * 1000)} > $out/source/${name}/timeout-up
-      ''
-      + lib.optionalString ((variantOf unit).stopTimeout or null != null) ''
-        printf '%d\n' ${toString ((variantOf unit).stopTimeout * 1000)} > $out/source/${name}/timeout-down
-      '';
+    ''
+      mkdir -p $out/source/${name}
+      printf '%s\n' ${if kind == "service" then "longrun" else "oneshot"} > $out/source/${name}/type
+      printf '%s' ${lib.escapeShellArg (dependencies unit)} > $out/source/${name}/dependencies
+    ''
+    + (
+      # a longrun's `run` is an executable the supervisor execs, but a oneshot's `up` is an
+      # execline command line which s6-rc-compile reads as text - so one is linked in and the
+      # other is written out. linking a binary in as `up` makes s6-rc try to parse an ELF
+      # header as a command.
+      if kind == "service" then
+        ''
+          ln -s ${runScript name unit} $out/source/${name}/run
+        ''
+        # `fork` means no notification at all: s6 calls it up once spawned. `s6` is the daemon
+        # notifying for itself, and `waitFor` is the wrapper in the run script notifying on its
+        # behalf - both arrive on the same descriptor, so both are declared the same way.
+        +
+          lib.optionalString
+            (lib.elem (readinessOf unit) [
+              "s6"
+              "waitFor"
+            ])
+            ''
+              printf '3\n' > $out/source/${name}/notification-fd
+            ''
+      else
+        ''
+          printf '%s\n' ${runScript name unit} > $out/source/${name}/up
+        ''
+    )
+    + lib.optionalString ((variantOf unit).startTimeout or null != null) ''
+      printf '%d\n' ${toString ((variantOf unit).startTimeout * 1000)} > $out/source/${name}/timeout-up
+    ''
+    + lib.optionalString ((variantOf unit).stopTimeout or null != null) ''
+      printf '%d\n' ${toString ((variantOf unit).stopTimeout * 1000)} > $out/source/${name}/timeout-down
+    '';
 
   # the whole point of this backend: the database is built here, not assembled at boot. a
   # the whole point of this backend: the database is built here, not assembled at boot. a
@@ -394,11 +355,7 @@ let
       pkgs.writeShellScript "s6-rc-user-status-${user}" ''
         up=$(${lib.getExe' s6rc "s6-rc"} -l ${userLive user} -a list 2>/dev/null || :)
 
-        for unit in ${
-          lib.concatStringsSep " " (
-            lib.attrNames (lib.filterAttrs (_: unit: kindOf unit != "anchor") (userUnits u))
-          )
-        }; do
+        for unit in ${lib.concatStringsSep " " (lib.attrNames (userUnits u))}; do
           if printf '%s\n' "$up" | ${lib.getExe' pkgs.gnugrep "grep"} -qx -- "$unit"; then
             state=running
           else
@@ -472,8 +429,8 @@ let
     EOF
 
     # called by runleveld for `telinit`. The contract has one bundle rather than runlevels -
-    # what would have been a runlevel is a trunk level, and reaching one is a matter of its
-    # dependencies having started - so every state change is the same state change.
+    # there is no level a machine is in, only units whose dependencies have or have not started -
+    # so every state change is the same state change.
     cat > $out/runlevel <<'EOF'
     #!${pkgs.runtimeShell} -e
     exec ${lib.getExe' s6rc "s6-rc"} -l ${live} -v2 -up change everything
@@ -658,7 +615,7 @@ in
         user: _:
         lib.nameValuePair "user-services-dir--${user}" {
           description = "supervision directory for ${user}";
-          requires = [ "sysinit" ];
+          requires = [ "tmpfiles-setup" ];
           type.oneshot.command = pkgs.writeShellScript "user-services-dir-${user}" ''
             ${lib.getExe' pkgs.coreutils "mkdir"} -p ${userRoot user}
             ${lib.getExe' pkgs.coreutils "chown"} ${user} ${userRoot user}
@@ -700,13 +657,13 @@ in
       # is the state, so this asks once and compares names rather than calling s6-svstat per
       # unit.
       #
-      # Over the atomic units - the ones with something to supervise - because a bundle is a
-      # compile-time name for a set and has no state of its own to report.
+      # Over the units, each of which is a service or a oneshot with state of its own - the only
+      # bundle is `everything`, which is a compile-time name for the set and is not one of them.
       providers.services.ctl.status = toString (
         pkgs.writeShellScript "s6-rc-status" ''
           up=$(${lib.getExe' s6rc "s6-rc"} -l ${live} -a list 2>/dev/null || :)
 
-          for unit in ${lib.concatStringsSep " " (lib.attrNames atomic)}; do
+          for unit in ${lib.concatStringsSep " " (lib.attrNames bootSide)}; do
             if printf '%s\n' "$up" | ${lib.getExe' pkgs.gnugrep "grep"} -qx -- "$unit"; then
               state=running
             else
@@ -725,8 +682,7 @@ in
           # not remove the unit from the list - one brought up by hand has none, and omitting it
           # would leave the engine unable to see, and so unable to stop, something that is
           # running. `unknown` cannot equal a real fingerprint, so such a unit is reconciled.
-          ${reportUnmanaged}
-          known=" ${lib.concatStringsSep " " (lib.attrNames atomic)} "
+          known=" ${lib.concatStringsSep " " (lib.attrNames bootSide)} "
 
           ${lib.getExe' s6rc "s6-rc"} -l ${live} -a list 2>/dev/null | while read -r unit; do
             # s6-rc's own internals are in the live state too - `s6rc-oneshot-runner` most of

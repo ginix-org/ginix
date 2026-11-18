@@ -49,7 +49,7 @@
       # in the system tree and in alice's, which is the case the preference order exists for.
       providers.services.units.shared = {
         type.service.command = daemon "shared-system";
-        requires = [ "sysinit" ];
+        requires = [ "tmpfiles-setup" ];
       };
 
       # `agent` is in both user trees and in neither the system's, which is the case nothing can

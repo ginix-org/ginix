@@ -17,15 +17,23 @@ in
     providers.services.units.sddm = {
       description = "sddm display manager";
 
-      # `multi-user`, like any other greeter. The logger, the seat manager and the session
-      # manager are all in earlier tiers, so naming them one at a time is no longer the way to
-      # be behind them - and `runlevels = "34"` goes with them, having meant that on a machine
-      # booting to 2 the greeter never started at all.
+      # a greeter: the filesystems, the logger, the bus and polkit, and whichever seat and
+      # session managers this machine has. `runlevels = "34"` goes, having meant that on a
+      # machine booting to 2 the greeter never started at all.
       #
       # sddm takes a vt of its own rather than one of the login prompts' - it asks logind or
-      # seatd for the next free one - so unlike ly or lemurs it claims no `providers.ttys`
-      # device.
-      requires = [ "multi-user" ];
+      # seatd for the next free one - so unlike ly or lemurs it claims no `tty-<device>` unit.
+      requires = [
+        "tmpfiles-setup"
+      ]
+      ++ config.providers.services.lib.present [
+        "syslogd"
+        "dbus"
+        "polkit"
+        "elogind"
+        "sessiond"
+        "seatd"
+      ];
 
       type.service.command = "/run/current-system/sw/bin/sddm";
     };

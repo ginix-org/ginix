@@ -31,7 +31,7 @@ let
   # written `PARTUUID=...` is a disk by every meaning this predicate has, and is named like none
   # of the two it knew, so it passed through unchanged to a machine with no such partition. What
   # that produces is `mount -a` failing on the one mount, which holds every dependent of
-  # `mount-filesystems` and stops the trunk - a machine that cannot boot in a VM over a mount it
+  # `mount-filesystems` and stops the boot - a machine that cannot boot in a VM over a mount it
   # was never going to need there.
   deviceTags = [
     "UUID="
@@ -121,7 +121,7 @@ in
               # X-mount.mkdir because the root is a fresh tmpfs: every one of these mount points
               # has to be created before anything can be mounted on it, and `mount -a` will not
               # do that by itself. This is util-linux' own option, not a systemd one. Without it
-              # the first stand-in fails, `mount-filesystems` fails with it, and the trunk stops
+              # the first stand-in fails, `mount-filesystems` fails with it, and the boot stops
               # there - which is how this was found, on /boot.
               #
               # The machine's own options are not carried across: they describe the filesystem it
@@ -239,10 +239,9 @@ in
       description = "overlay a writable layer over the store";
 
       requires = [
-        (lib.head config.providers.services.trunk.levels)
         "tmpfiles-setup"
-        "mount-filesystems"
-      ];
+      ]
+      ++ config.providers.services.lib.present [ "mount-filesystems" ];
 
       type.oneshot.command = toString (
         pkgs.writeShellScript "nix-store-writable" ''
@@ -278,9 +277,8 @@ in
       description = "register the system closure in the nix database";
 
       # `tmpfiles-setup` makes /nix/var and the directories under it, and this writes into
-      # them. Both are in the head tier, and a tier starts together, so the edge is named.
+      # them, so the edge is named.
       requires = [
-        (lib.head config.providers.services.trunk.levels)
         "tmpfiles-setup"
         "nix-store-writable"
       ];
@@ -326,15 +324,34 @@ in
     # systemd's getty generator does on nixos - so the boot log scrolls past and then stops,
     # because syslogd takes finit's logging once it starts, and there is no way in.
     #
-    # `mkDefault`, so a machine's vmVariant can claim the same device for something else - a
-    # display manager, or an autologin.
+    # `tty-<device>`, the name a terminal is claimed by, with what runs there at `mkDefault` -
+    # so a machine's vmVariant can claim the same device for something else, a display manager
+    # or an autologin. The getty is the machine's own, from services.getty's options, whether
+    # or not that module is enabled.
     #
     # Worth knowing: this is the machine's own user database, password hashes included. A
     # virtual machine built from a real configuration is as good as that configuration's
     # credentials, and should be treated the way the machine is.
-    providers.ttys.devices.${serial} = lib.mkDefault {
-      description = "login on the serial console";
-      requires = [ "multi-user" ];
+    providers.services.units."tty-${serial}" = {
+      description = lib.mkOverride 900 "login on the serial console";
+      requires = lib.mkDefault (
+        [ "tmpfiles-setup" ]
+        ++ config.providers.services.lib.present [
+          "syslogd"
+          "elogind"
+          "sessiond"
+          "seatd"
+        ]
+      );
+      type.service = {
+        terminal = true;
+        command = lib.mkDefault (
+          (import ../services/getty/login.nix { inherit pkgs lib; }).commandFor {
+            device = serial;
+            inherit (config.services.getty) package args extraArgs;
+          }
+        );
+      };
     };
 
     boot.kernelParams = [ "console=${serial},115200n8" ];

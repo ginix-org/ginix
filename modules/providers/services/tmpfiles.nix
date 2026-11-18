@@ -241,8 +241,7 @@ in
 
     description = ''
       Volatile files and directories to put in place during early boot, as the `tmpfiles-setup`
-      unit at the head of the trunk - so everything attached to any later trunk level is behind
-      them.
+      unit. A daemon which wants something put in place here names that unit in its `requires`.
 
       Rules are attrsets rather than {manpage}`tmpfiles.d(5)` lines because they are lowered
       into commands when the system is built. Nothing on the machine parses them, so an
@@ -261,7 +260,7 @@ in
       #
       # This was a `writeShellApplication`, which prepends `set -euo pipefail` - so the first
       # rule to fail ended the script, every rule after it never ran, and the unit never
-      # completed. Everything in the trunk waits on this one, so a single unhappy rule took the
+      # completed. Nearly every daemon waits on this one, so a single unhappy rule took the
       # whole machine with it and said nothing about which rule it was: the boot simply stopped
       # after "create volatile files and directories" with no error to go on.
       #
@@ -311,22 +310,16 @@ in
         fi
       '';
 
-      # the earliest point in the trunk, so that every *later level* - and so everything
-      # attached to any of them - is behind the files it puts in place.
+      # after the mounts: a rule writing into /var before /var is mounted puts the files on the
+      # root filesystem, where the real /var is then mounted on top of them and they are neither
+      # present nor recoverable. Through `present` because a backend which mounts them itself
+      # may turn `mount-filesystems` off.
       #
-      # Its own tier is not, and that is the part worth being careful about: units attached to
-      # one level start together, so anything in the head tier which wants a directory from
-      # here has to name this unit, exactly as this one names the mount below. dbus is the
-      # case which found it - it binds a socket in /run/dbus and died on every boot until the
+      # And nothing else, so that it is as early as it can be. Anything which wants a file or a
+      # directory from here names this unit - which is most daemons with state, and dbus is the
+      # case which found it: it binds a socket in /run/dbus and died on every boot until the
       # directory happened to exist, which finit papered over by restarting it until it did.
-      #
-      # After the mounts, for the same class of reason: a rule writing into /var before /var is
-      # mounted puts the files on the root filesystem, where the real /var is then mounted on
-      # top of them and they are neither present nor recoverable.
-      requires = [
-        (lib.head cfg.trunk.levels)
-        "mount-filesystems"
-      ];
+      requires = cfg.lib.present [ "mount-filesystems" ];
     };
   };
 }

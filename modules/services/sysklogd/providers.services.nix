@@ -31,14 +31,14 @@ in
         readiness = "fork";
       };
 
-      # attached to the head of the trunk, so logging is up before `sysinit` is reached and
-      # everything in a later tier can log. Nothing else should have to name syslogd to get
-      # that, which is what the optional `requires = [ "syslogd" ]` scattered through the other
-      # service modules is working around.
+      # `syslogd` whichever logger it is, so anything wanting to log from its first line names
+      # that through `providers.services.lib.present` - which is what nothing had to do while
+      # the old tiers put this first, and what the old optional `requires = [ "syslogd" ]` in the
+      # service modules was reaching for before that.
       #
-      # The device manager is asked to populate /dev first where there is one. Both managers
-      # have a unit which triggers that - udev's coldplug, mdevd's - and both are named rather
-      # than relied on through the trunk.
+      # The device manager is asked to populate /dev first where there is one. Every manager
+      # has a unit which triggers that - udev's and gardendevd's coldplug, mdevd's settle, which
+      # is the same step for it - and each is named.
       #
       # The trigger and not a settle. udev used to offer one and this named it, which meant a
       # logger waited for the entire device tree to drain before it could start - about two
@@ -46,15 +46,12 @@ in
       # before any unit runs, so /dev/log has somewhere to live regardless. What the ordering
       # actually buys is that a manager which is going to create nodes has started doing so.
       requires = [
-        (lib.head config.providers.services.trunk.levels)
-
-        # in the same tier, so named rather than merely attached-after: /var/log is one of the
-        # base tmpfiles rules, and on a machine where it is not already on disk the logger
-        # would otherwise race the unit which creates it.
+        # /var/log is one of the base tmpfiles rules, and on a machine where it is not already on
+        # disk the logger would otherwise race the unit which creates it.
         "tmpfiles-setup"
       ]
       ++ lib.optional config.services.udev.enable "udev-coldplug"
-      ++ lib.optional config.services.mdevd.enable "coldplug"
+      ++ lib.optional config.services.mdevd.enable "devices-settled"
       ++ lib.optional config.services.gardendevd.enable "gardendevd-coldplug"
 
       # and the thing which mounts /var/log, where there is one.
@@ -67,14 +64,15 @@ in
       #
       # It cost a diagnosis to find. A machine on sinit left no trace of itself at all - forty
       # boots in the logs, none of them that one - because sinit launches every job at once and
-      # orders them only by latch, so nothing serialised the two. On finit the tiers happened to.
+      # orders them only by latch, so nothing serialised the two. On finit the old tiers
+      # happened to.
       #
-      # Named by unit rather than by option, because `preservation` is not finix's: the module
-      # declaring it lives elsewhere, and asking after `config.preservation.enable` would be an
-      # eval error on every machine without it. `enable` and not merely presence - a disabled unit
+      # Named through `present` rather than by option, because `preservation` is not finix's: the
+      # module declaring it lives elsewhere, and asking after `config.preservation.enable` would be
+      # an eval error on every machine without it. `present` checks `enable` too - a disabled unit
       # is still an attribute, and requiring one no backend will emit is how a logger waits for
       # something that never starts.
-      ++ lib.optional (config.providers.services.units.preservation.enable or false) "preservation";
+      ++ config.providers.services.lib.present [ "preservation" ];
     };
   };
 }

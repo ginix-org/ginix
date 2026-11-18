@@ -110,8 +110,9 @@ let
 
   # whether a unit can reach itself is a global property, so this one does need the walk.
   # `path` is the chain currently being descended and catches back-edges; `visited` memoises
-  # subtrees already proven clean, without which every diamond in the graph - and a trunk level
-  # requiring all of its dependants makes them ubiquitous - is re-explored once per branch.
+  # subtrees already proven clean, without which every diamond in the graph - and a daemon which
+  # names the same few early units as every other makes them ubiquitous - is re-explored once
+  # per branch.
   detect =
     path: visited: name:
     if lib.elem name path then
@@ -159,7 +160,6 @@ in
     ./ctl.nix
     ./switch.nix
     ./tmpfiles.nix
-    ./trunk.nix
     ./users.nix
   ];
 
@@ -185,11 +185,11 @@ in
       };
 
       # Nothing here describes how an implementation does something - only what it will refuse
-      # or fail to honour. `nativeAnchors` and `nativeStartOnlyEdges` used to sit here and did
-      # neither: an anchor and a start-only edge are part of the contract's vocabulary and are
-      # always available, natively on the implementations which have them and emulated on the
-      # ones which do not, with identical behaviour either way. A flag nothing reads, for a
-      # difference nothing can observe, is a worse thing to carry than the emulation.
+      # or fail to honour. `nativeStartOnlyEdges` used to sit here and did neither: a start-only
+      # edge is part of the contract's vocabulary and is always available, natively on the
+      # implementations which have it and emulated on the ones which do not, with identical
+      # behaviour either way. A flag nothing reads, for a difference nothing can observe, is a
+      # worse thing to carry than the emulation.
       readiness = lib.mkOption {
         type = lib.types.listOf (
           lib.types.enum [
@@ -498,10 +498,24 @@ in
       type = lib.types.raw;
       default = {
         inherit (readinessLib) waitFor;
+
+        # the names given which this machine has, enabled. Only the names: whether a unit
+        # exists is decided by which modules are on, never by anything a unit requires, so
+        # asking this from inside a unit's `requires` cannot go round in a circle.
+        present = lib.filter (name: cfg.units ? ${name} && cfg.units.${name}.enable);
       };
       defaultText = lib.literalMD "functions; see the description";
       example = lib.literalExpression ''
         {
+          # a daemon which keeps state, logs, and touches hardware
+          providers.services.units.foo.requires = [
+            "tmpfiles-setup"
+          ]
+          ++ config.providers.services.lib.present [
+            "syslogd"
+            "devices-settled"
+          ];
+
           # a gate: dependants of `dev-ttyUSB0` start once the device node is there
           providers.services.units.dev-ttyUSB0 = {
             type.oneshot = {
@@ -513,6 +527,12 @@ in
       '';
       description = ''
         Functions for writing units.
+
+        `present` takes a list of unit names and returns those this machine has and has
+        enabled. It is how a unit names something only some machines provide - the system
+        logger is `syslogd` whichever logger it is, a device manager's settle is
+        `devices-settled` whichever device manager it is - without an edge to nothing where
+        there is none, which the contract refuses.
 
         `waitFor.path`, `waitFor.socket` and `waitFor.pidfile` each take a path and return a
         command which blocks until it is live - the same waits a service's
@@ -590,17 +610,13 @@ in
                   What kind of unit this is, and whatever that kind needs.
 
                   `service` is a long-running process. `oneshot` is a command which runs to
-                  completion and is ready once it has exited successfully. `anchor` has no
-                  process at all and is ready once its own requirements are.
+                  completion and is ready once it has exited successfully. `shutdown` is a
+                  command run once on the way down, after everything else has stopped.
 
-                  Anchors exist to be named, so a unit can say "after the system is basically
-                  up" without naming the units that means. In practice they are the trunk, and
-                  ordinary modules have no reason to declare one - an interchangeable
-                  implementation should be selected by a `providers.` contract and define the
-                  shared unit name directly, rather than hiding behind an anchor.
-
-                  A kind carrying nothing may be written as a bare string, so `type = "anchor"`
-                  and `type = { anchor = { }; }` mean the same thing.
+                  There is no kind for a unit with no process. A unit which wants to say "after
+                  the system logger" or "after devices have settled" names the unit which does
+                  that - and where several implementations can provide one thing, they define
+                  the same unit name, so whichever is enabled is what gets named.
                 '';
                 type =
                   let
@@ -999,11 +1015,6 @@ in
                         };
                       };
 
-                      anchor = lib.mkOption {
-                        description = "A unit with no process at all.";
-                        type = lib.types.submodule { };
-                      };
-
                       shutdown = lib.mkOption {
                         description = ''
                           A command run once, on the way down, after every other unit has
@@ -1032,26 +1043,21 @@ in
 
               requires = lib.mkOption {
                 type = with lib.types; listOf str;
-                # the trunk's own levels are excluded: a level derives its own requires from
-                # the chain, and defaulting it to the head would make the first level require
-                # itself
-                #
-                # nor is a shutdown unit, whose edges order the shutdown script and so may only
-                # name other shutdown units
-                default = lib.optional (!(lib.elem name cfg.trunk.levels) && !(config.type ? shutdown)) (
-                  lib.head cfg.trunk.levels
-                );
-                defaultText = lib.literalExpression "[ (lib.head config.providers.services.trunk.levels) ]";
+                default = [ ];
                 description = ''
                   The units which must be ready before this one starts. Losing one afterwards
                   has no effect on this unit.
 
-                  At most one of these may be a trunk level - see
-                  {option}`providers.services.trunk.levels`.
+                  Nothing is implied: a unit which requires nothing starts as soon as the system
+                  does, alongside the filesystems being mounted. A daemon which keeps state
+                  wants `tmpfiles-setup`, which is behind the mounts; one which logs wants the
+                  system logger; one which touches hardware wants `devices-settled`. Names only
+                  some machines have - the logger, the device manager's settle, the bus - are
+                  named through {option}`providers.services.lib.present`, so the edge exists
+                  where the unit does and nowhere else.
 
-                  A unit which requires nothing is attached to the first trunk level instead of
-                  floating free, so that it still has a place in the tree and the second level
-                  still waits for it. Setting this to an empty list explicitly opts out.
+                  For a `shutdown` unit these order it among the other shutdown units, and may
+                  name nothing else.
                 '';
               };
 
@@ -1362,21 +1368,6 @@ in
         }
       )
     ]
-
-    ++ lib.mapAttrsToList (
-      name: unit:
-      let
-        attached = lib.filter (dep: lib.elem dep cfg.trunk.levels) unit.requires;
-      in
-      {
-        assertion = lib.length attached < 2;
-        message = ''
-          providers.services.units.${name} requires more than one trunk level: ${lib.concatStringsSep ", " attached}
-          A unit attaches to exactly one level. Requiring two also makes the later level require
-          this unit, by way of the earlier one, which is a cycle.
-        '';
-      }
-    ) (lib.filterAttrs (name: _: !(lib.elem name cfg.trunk.levels)) cfg.units)
 
     # the two sides of the graph never meet. A shutdown unit's edges order the shutdown script,
     # which runs once everything else has stopped, so an edge from one to a boot unit names

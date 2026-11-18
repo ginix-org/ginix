@@ -21,7 +21,7 @@ let
       false;
 in
 {
-  imports = [ ./providers.ttys.nix ];
+  imports = [ ./providers.services.nix ];
 
   options.services.lemurs = {
     enable = lib.mkOption {

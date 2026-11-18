@@ -138,9 +138,9 @@ in
 
       # after the mount, not merely early: /run/wrappers is a tmpfs declared in fileSystems,
       # and the script's first act is `chmod 755 /run/wrappers` under `set -e`. Attached to
-      # the trunk's head it races the unit which mounts it, and when it loses it dies on that
+      # nothing, it races the unit which mounts it, and when it loses it dies on that
       # chmod without saying anything.
-      requires = [ "mount-filesystems" ];
+      requires = config.providers.services.lib.present [ "mount-filesystems" ];
     };
   };
 }

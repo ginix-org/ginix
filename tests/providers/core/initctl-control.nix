@@ -38,7 +38,7 @@ in
 
       providers.services.units.subject = {
         type.service.command = coreLib.daemon "subject";
-        requires = [ "sysinit" ];
+        requires = [ "tmpfiles-setup" ];
       };
     };
 

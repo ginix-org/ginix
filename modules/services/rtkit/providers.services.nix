@@ -17,13 +17,15 @@ in
     providers.services.units.rtkit-daemon = {
       description = "RealtimeKit scheduling policy service";
 
-      # polkit is named because it is a sibling in this tier - a tier orders a unit against
-      # everything before it and says nothing about what sits beside it. `nohup` and `cgroup`
-      # are gone with the stanza: finit's own process handling, which the contract does not
-      # model and no other implementation would honour.
+      # polkit, which it asks whether a client may have what it asks for, and the bus it is
+      # reached over. `nohup` and `cgroup` are gone with the stanza: finit's own process
+      # handling, which the contract does not model and no other implementation would honour.
       requires = [
-        "basic"
         "polkit"
+      ]
+      ++ config.providers.services.lib.present [
+        "dbus"
+        "syslogd"
       ];
 
       type.service.command =

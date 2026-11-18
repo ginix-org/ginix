@@ -57,10 +57,6 @@
 
       providers.services.users.alice.units.agent = {
         type.service.command = userDaemon "agent";
-
-        # `requires` defaults to the first trunk level, which is a system unit - a user unit
-        # has to opt out of it explicitly.
-        requires = [ ];
       };
 
       providers.services.units = {
@@ -70,12 +66,12 @@
             mkdir -p /run/svc-test
             touch /run/svc-test/early.ran
           '';
-          requires = [ "start" ];
+          requires = [ ];
         };
 
         alpha = {
           type.service.command = daemon "alpha";
-          requires = [ "sysinit" ];
+          requires = [ "tmpfiles-setup" ];
         };
 
         # a dependent of a service. On this backend it is the subject rather than the scenery:
@@ -88,7 +84,7 @@
 
         gamma = {
           type.service.command = daemon "gamma";
-          requires = [ "basic" ];
+          requires = [ "tmpfiles-setup" ];
         };
 
         # the readiness gate, built so that getting it wrong is visible rather than a race.
@@ -99,7 +95,7 @@
         # this backend leans on - it would start about three seconds earlier, and the comparison
         # below would catch it.
         slow = {
-          requires = [ "sysinit" ];
+          requires = [ "tmpfiles-setup" ];
           type.service = {
             command = pkgs.writeShellScript "slow" ''
               export PATH=${pkgs.coreutils}/bin:$PATH
@@ -151,16 +147,11 @@
           machine.wait_until_succeeds("systemctl is-system-running --wait || true", timeout=120)
           machine.succeed("test \"$(readlink /proc/1/exe | grep -c systemd)\" = 1")
 
-      with subtest("the trunk came up in order"):
-          for level in ["start", "sysinit", "basic", "multi-user", "running"]:
-              machine.wait_until_succeeds(f"systemctl is-active finix-{level}.target")
-
-      with subtest("the trunk did not shadow systemd's own special targets"):
-          # four default trunk levels are named after systemd special targets, and `shutdown` is
-          # the unit systemd isolates to on the way down. Unprefixed, a trunk level would have
-          # replaced it and the machine would not come down at all.
-          for level in ["sysinit", "basic", "multi-user"]:
-              machine.succeed(f"test -e /etc/systemd/system/finix-{level}.target")
+      with subtest("our units did not shadow systemd's own"):
+          # every unit is rendered with a prefix, so a configuration's unit names cannot replace
+          # one of systemd's - `shutdown.target` above all, the unit systemd isolates to on the
+          # way down, without which the machine would not come down at all
+          machine.succeed("test -e /etc/systemd/system/finix-early.service")
           machine.succeed("systemctl cat shutdown.target | grep -q RefuseManualStart")
           machine.succeed("systemctl cat basic.target | grep -q 'man:systemd.special'")
 
@@ -204,8 +195,8 @@
 
       # Before the switch-stop subtest below, not after it. That one's control assertion stops
       # a unit *without* --job-mode=ignore-requirements on purpose, to show the flag matters -
-      # and the stop climbs the trunk, because the level above has the stopped unit as a
-      # dependant. Everything attached to that level goes with it, polkit included, and only
+      # and the stop climbs the graph, because systemd propagates an explicit stop to whatever
+      # requires the stopped unit. Everything downstream goes with it, polkit included, and only
       # alpha and beta are put back. A session needs polkit to start her manager at all, so
       # from there this subtest fails for a reason that has nothing to do with it.
       with subtest("a user's tree is started by her session, and not before"):
@@ -301,14 +292,14 @@
           machine.wait_until_succeeds("initctl status alpha > /tmp/st; grep -q running /tmp/st")
           machine.succeed("initctl status early > /tmp/st2; grep -q done /tmp/st2")
 
-      with subtest("shutdown runs the shutdown side, in trunk order"):
+      with subtest("shutdown runs the shutdown units, in dependency order"):
           # `initctl poweroff`, which resolves to `systemctl poweroff` here, rather than
           # machine.shutdown(): the contract's own command is what asks a backend to stop, and
           # using it is also the check that shutdownCommands reaches something real.
           #
-          # The shutdown side is one script, hung off finix-shutdown.service's ExecStop. That unit
+          # The shutdown units are one script, hung off finix-shutdown.service's ExecStop. That unit
           # is ordered before everything else on the way up, so it stops after everything else on
-          # the way down - which is what the latch means.
+          # the way down - which is what a shutdown unit is promised.
           machine.execute("(initctl poweroff &) >/dev/null 2>&1", check_return=False)
 
           machine.wait_for_console_text("SYSTEMD-SHUTDOWN-1-late")

@@ -61,7 +61,11 @@
             ${note "alpha"}
             exec ${pkgs.coreutils}/bin/sleep infinity
           '';
-          requires = [ "sysinit" ];
+          # after the logger, which is the point: its output is to go there
+          requires = [
+            "tmpfiles-setup"
+            "syslogd"
+          ];
         };
 
         # readiness over s6's own protocol, deliberately late: anything requiring this must
@@ -93,7 +97,10 @@
           type.oneshot.command = pkgs.writeShellScript "delta" ''
             echo "delta-to-syslog" >&2
           '';
-          requires = [ "sysinit" ];
+          requires = [
+            "tmpfiles-setup"
+            "syslogd"
+          ];
         };
       };
 

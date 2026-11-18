@@ -17,16 +17,14 @@ in
     providers.services.units.tzupdate = {
       description = "timezone update service";
 
-      # it asks the network where it is, so it waits for one. syslogd is in the head tier and
-      # needs no naming.
-      # `multi-user` rather than `basic`, because `network-online` moved there: it used to run
-      # a tier ahead of the daemons which bring a link up, which meant it could not see them.
-      # Naming it from `basic` now would be a cycle - the level waits for this unit, and this
-      # unit waits for a later level - so anything wanting a route waits in the same tier the
-      # route appears in.
+      # it asks the network where it is, so it waits for a route - `network-online`, which is
+      # the portable unit for that - and the logger
       requires = [
-        "multi-user"
+        "tmpfiles-setup"
         "network-online"
+      ]
+      ++ config.providers.services.lib.present [
+        "syslogd"
       ];
 
       type.oneshot.command = "${cfg.package}/bin/tzupdate -z ${pkgs.tzdata}/share/zoneinfo -d /dev/null";

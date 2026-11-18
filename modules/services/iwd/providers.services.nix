@@ -16,7 +16,16 @@ in
   config = lib.mkIf cfg.enable {
     providers.services.units.iwd = {
       description = "wireless service";
-      requires = [ "basic" ];
+
+      # its state, the bus it is driven over, the logger, and the firewall where there is one
+      requires = [
+        "tmpfiles-setup"
+      ]
+      ++ config.providers.services.lib.present [
+        "dbus"
+        "syslogd"
+        "nftables"
+      ];
 
       # iwd runs resolvconf by name when it has one
       path = lib.optional config.programs.resolvconf.enable config.programs.resolvconf.package;

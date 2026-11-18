@@ -46,7 +46,7 @@ in
         # an ordinary boot-side daemon, so the shutdown side has something to have stopped
         running-daemon = {
           type.service.command = coreLib.daemon "running-daemon";
-          requires = [ "sysinit" ];
+          requires = [ "tmpfiles-setup" ];
         };
 
         # the second requires the first, which is what orders them. Without the edge they would

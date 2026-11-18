@@ -81,15 +81,18 @@ in
         '';
       };
 
-      # `multi-user` itself, not `basic`: attaching to a level makes you a dependant of it,
-      # and a level's dependants are what the *next* level waits on - so requiring `basic`
-      # was making dhcpcd a prerequisite of `multi-user`, serializing a DHCP lease ahead of
-      # getty and everything else that only needs `multi-user`, for no reason any of them
-      # actually needs. Nothing before `multi-user` touches the network, and nothing after
-      # this point is entitled to assume a lease exists either - `network-online` is the unit
-      # that promises that, to whatever actually needs it - so dhcpcd only has to be running
-      # by the time the things beside it are, not done.
-      requires = [ "multi-user" ];
+      # its state directory, the logger, and the firewall where there is one: a lease is the
+      # machine becoming reachable, which it should not be before its ruleset is loaded.
+      #
+      # Nothing waits for dhcpcd itself - `network-online` is the unit that promises a lease,
+      # to whatever actually needs one - so it only has to be running, not done.
+      requires = [
+        "tmpfiles-setup"
+      ]
+      ++ config.providers.services.lib.present [
+        "syslogd"
+        "nftables"
+      ];
     };
 
     providers.services.tmpfiles.rules = [

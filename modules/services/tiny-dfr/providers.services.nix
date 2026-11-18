@@ -11,14 +11,21 @@ in
     providers.services.units.tiny-dfr = {
       description = "Apple Touch Bar daemon";
 
-      # multi-user, for the reason the shipped unit orders itself after logind and getty: the
+      # after the seat manager, for the reason the shipped unit orders itself after logind: the
       # daemon takes the Touch Bar's seat, and taking a seat wants the seat manager already
-      # there. elogind attaches to `basic`, so `multi-user` is after it.
+      # there.
       #
       # Upstream also binds the unit to three device units, which is how it survives the strip
       # going away on a suspend. There is no device unit here to bind to; a supervised service
       # which exits is restarted, which covers the same ground from the other direction.
-      requires = [ "multi-user" ];
+      requires = [
+        "tmpfiles-setup"
+      ]
+      ++ config.providers.services.lib.present [
+        "syslogd"
+        "elogind"
+        "seatd"
+      ];
 
       # A daemon which draws until it is stopped, so the default service type is right - and
       # nothing to wait for beyond it being spawned. It opens the DRM device itself and will

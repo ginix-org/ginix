@@ -17,9 +17,15 @@ in
     providers.services.units.php-fpm = {
       description = "php fastcgi process manager";
 
-      # the logger is in the tier which completes `basic`, so `service/syslogd/ready` is
-      # behind this without being named
-      requires = [ "basic" ];
+      # the logger, which is what `service/syslogd/ready` said, and the firewall where there is
+      # one, since this is the machine listening
+      requires = [
+        "tmpfiles-setup"
+      ]
+      ++ config.providers.services.lib.present [
+        "syslogd"
+        "nftables"
+      ];
 
       type.service = {
         command = "${cfg.package}/bin/php-fpm -y ${cfg.configFile}";

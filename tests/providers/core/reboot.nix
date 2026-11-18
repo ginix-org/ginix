@@ -40,7 +40,7 @@ in
         # not an empty one that happens to reach the syscall.
         running-daemon = {
           type.service.command = coreLib.daemon "running-daemon";
-          requires = [ "sysinit" ];
+          requires = [ "tmpfiles-setup" ];
         };
 
         # the shutdown units run on a reboot too, which is not obvious and is worth pinning: on

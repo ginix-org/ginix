@@ -26,7 +26,7 @@
 
       providers.services.units.dnsmasq = {
         description = "dhcp and dns for the test network";
-        requires = [ "basic" ];
+        requires = [ "tmpfiles-setup" ];
 
         type.service.command = pkgs.writeShellScript "dnsmasq" ''
           exec ${lib.getExe pkgs.dnsmasq} --keep-in-foreground \

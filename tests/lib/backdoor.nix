@@ -109,18 +109,18 @@ in
       description = "test driver backdoor shell";
       type.service.command = backdoorScript;
 
-      # attached to the head of the trunk rather than to `multi-user`, so that the driver's
+      # requiring nothing, rather than something which means the system is up, so that the driver's
       # shell is not downstream of the units a test is manipulating.
       #
       # It used to require `multi-user`, which read better: a test seeing a shell could assume
-      # the system had come up. But that put the backdoor above every unit attached to an
-      # earlier level, and on s6-rc a switch which adds one of those restarts everything
+      # the system had come up. But that put the backdoor downstream of every unit in an
+      # earlier tier, and on s6-rc a switch which adds one of those restarts everything
       # depending on it - the driver's own shell included, mid-command, which arrives as a test
       # that hangs rather than one that fails. An observer belongs outside what it observes.
       #
       # What the driver connecting no longer implies, tests say for themselves: the core ones
-      # wait on a unit attached to `running`.
-      requires = [ "start" ];
+      # wait on a unit requiring every other one.
+      requires = [ ];
     };
   };
 }

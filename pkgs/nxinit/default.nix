@@ -20,7 +20,7 @@
 
 # nxinit, which is the same shape as sinit: block a few signals, exec one child, reap what
 # lands on pid 1, and answer a signal each for reboot and poweroff. Everything a service
-# manager does - supervision, readiness, ordering, the trunk - is `providers.services`' job
+# manager does - supervision, readiness, ordering, shutdown - is `providers.services`' job
 # above it, exactly as it is for sinit.
 #
 # Pinned to a revision rather than tracking a branch. Upstream is seven commits old and says

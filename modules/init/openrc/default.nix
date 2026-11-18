@@ -12,9 +12,9 @@
 # protocol: a service is started when its `start` returns, so every `waitFor` kind is a poll in
 # `start_post`, and `notify`/`s6` are refused rather than pretended at.
 #
-# Runlevels are deliberately unused. OpenRC has them and the contract has a trunk, and the two
-# say different things: a runlevel is a set a machine is in, a trunk level is a unit others
-# wait for. Everything goes in `default` and the ordering comes from `need`, which is the
+# Runlevels are deliberately unused. OpenRC has them and the contract has a graph, and the two
+# say different things: a runlevel is a set a machine is in, an edge is a unit another
+# waits for. Everything goes in `default` and the ordering comes from `need`, which is the
 # contract's own graph rather than a second one beside it.
 {
   config,
@@ -78,7 +78,7 @@ let
       # `:` rather than nothing. gendepends builds the dependency tree by sourcing each
       # runscript, and a shell function with an empty body is a syntax error - so a unit which
       # requires nothing would fail to source, drop out of the tree, and take down everything
-      # that named it. The trunk's first level is exactly that unit, so the whole graph went
+      # that named it. The early units are exactly those, so the whole graph went
       # with it: "backdoor needs service(s) start", and the same for all 29.
       ":"
     else
@@ -100,8 +100,8 @@ let
   # Returning non-zero there marks the service failed, which is the honest answer: it is
   # running and has not become ready, and whatever required it must not start.
   #
-  # Only a service has readiness at all - a oneshot is ready once it has exited, an anchor once
-  # what it requires is - so this is asked of nothing else.
+  # Only a service has readiness at all - a oneshot is ready once it has exited - so this is
+  # asked of nothing else.
   waitForBlock =
     name: unit:
     let
@@ -139,19 +139,7 @@ let
         ${environmentOf unit}
       ''
       + (
-        if kind == "anchor" then
-          ''
-            # an anchor has no process: it is a name which becomes ready once the units it
-            # requires are, which `need` above has already said.
-            start() {
-              return 0
-            }
-
-            stop() {
-              return 0
-            }
-          ''
-        else if kind == "oneshot" then
+        if kind == "oneshot" then
           ''
             # openrc marks a service started when `start` returns successfully, which is what a
             # oneshot means: it has run, and whatever waited for it may go.

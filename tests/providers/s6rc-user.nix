@@ -66,16 +66,12 @@
           ${pkgs.coreutils}/bin/mkdir -p /run/svc-test
           ${pkgs.coreutils}/bin/chmod 1777 /run/svc-test
         '';
-        requires = [ "sysinit" ];
+        requires = [ "tmpfiles-setup" ];
       };
 
       providers.services.users.alice.units = {
         agent = {
           type.service.command = daemon "alice-agent" "123456";
-
-          # `requires` defaults to the first trunk level, which is a system unit - so a user
-          # unit has to opt out of it explicitly.
-          requires = [ ];
         };
 
         # an edge inside her own tree, which here is an s6-rc dependency in the compiled

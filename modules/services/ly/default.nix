@@ -23,7 +23,7 @@ let
       false;
 in
 {
-  imports = [ ./providers.ttys.nix ];
+  imports = [ ./providers.services.nix ];
 
   options.services.ly = {
     enable = lib.mkOption {

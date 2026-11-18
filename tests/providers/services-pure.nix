@@ -25,7 +25,7 @@
         # an ordinary daemon, to prove the graph still works around the infrastructure
         marker = {
           description = "record that the graph ran";
-          requires = [ "basic" ];
+          requires = [ "tmpfiles-setup" ];
           path = [ config.programs.coreutils.package ];
           type.oneshot.command = pkgs.writeShellScript "marker" ''
             mkdir -p /run/svc-test
@@ -54,7 +54,7 @@
         # finit stanza, and so existed on finit and nowhere else
         assert status("mdevd") == "running", f"mdevd is {status('mdevd')}"
         machine.succeed("test -f /run/finit/cond/task/mdevd-started/success")
-        assert status("coldplug") == "done", f"coldplug is {status('coldplug')}"
+        assert status("devices-settled") == "done", f"devices-settled is {status('devices-settled')}"
 
     with subtest("the terminal is plain finit config, not a unit"):
         # `Starting tty-tty1`, not the unit's description: finit turns its progress display
@@ -73,8 +73,7 @@
             "ifupdown-ng", "keventd", "backdoor", "syslogd",
         }
         contract = {
-            "start", "sysinit", "basic", "multi-user", "running",
-            "mdevd", "mdevd-started", "coldplug", "marker",
+            "mdevd", "mdevd-started", "devices-settled", "marker",
             "providers-services-shutdown",
             # emitted by the contract now, not by finit: putting volatile files in place and
             # installing the setuid wrappers are part of bringing a machine up, so every

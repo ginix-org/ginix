@@ -17,9 +17,6 @@ in
     providers.services.units.gardendevd = {
       description = "device event daemon (gardendevd)";
 
-      # the head tier, beside the other device managers, so `sysinit` waits for device events
-      requires = [ (lib.head config.providers.services.trunk.levels) ];
-
       # the rules gardendevd runs invoke helpers by name. Every implementation gives a unit a
       # PATH now, dinit's is scripted in by its backend, so this says what it wants and no more.
       inherit (cfg) path;
@@ -41,36 +38,33 @@ in
 
     # the trigger and the settle, split the way udev's are and for the same reason.
     #
-    # These were one unit on the head of the trunk, so `sysinit` waited for the whole device
-    # queue to drain before the rest of the boot could proceed. That is the cost udev paid too,
-    # but here it was worse than slow: a rule whose helper never returns - the zfs package's
-    # rules are on every machine with zfs enabled - holds the settle, the settle held `sysinit`,
-    # and the boot stopped after the head tier with nothing on the console to say why.
+    # These were one unit everything early in the boot waited for, so nothing else could
+    # proceed until the whole device queue drained. That is the cost udev paid too, but here it
+    # was worse than slow: a rule whose helper never returns - the zfs package's
+    # rules are on every machine with zfs enabled - holds the settle, the settle held the boot,
+    # and it stopped partway with nothing on the console to say why.
     #
-    # `gardendevctl trigger` only queues the events, so the coldplug stays on the head of the
-    # trunk, where devices have to start appearing, and costs nothing to wait for.
+    # `gardendevctl trigger` only queues the events, so the coldplug follows the daemon straight
+    # away, where devices have to start appearing, and costs nothing to wait for.
     #
     # The two were `run` stanzas ordered against each other by finit priority, which no other
     # implementation has; the settle `requires` the trigger, which says the same to every one.
     providers.services.units.gardendevd-coldplug = {
       description = "trigger coldplug events";
 
-      requires = [
-        (lib.head config.providers.services.trunk.levels)
-        "gardendevd"
-      ];
+      requires = [ "gardendevd" ];
 
       type.oneshot.command = "${cfg.package}/bin/gardendevctl trigger -c add -t all";
     };
 
-    # and the wait, attached to no tier.
+    # and the wait, which nothing waits for unless it says so.
     #
-    # `requires` names no trunk level, so no barrier waits for this: it runs for whoever asks for
-    # it by name. That is the few consumers which want "enumeration is finished" as a global
-    # property - ifupdown-ng waiting out interface renames, keyd grabbing every keyboard - and
-    # which name it already. Anything else wants `type.service.readiness.waitFor.path`; see
-    # udev's `udev-settle` for the longer argument.
-    providers.services.units.gardendevd-settle = {
+    # It runs for whoever asks for it by name. That is the few consumers which want "enumeration
+    # is finished" as a global property - ifupdown-ng waiting out interface renames, keyd
+    # grabbing every keyboard - and which name it already. Anything else wants a `waitFor`; see
+    # udev's settle for the longer argument. `devices-settled` is the name every device manager
+    # gives its settle, so a consumer names the one thing whichever of them is enabled.
+    providers.services.units.devices-settled = {
       description = "wait for the device queue to drain";
 
       requires = [ "gardendevd-coldplug" ];

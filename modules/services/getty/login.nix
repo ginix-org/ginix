@@ -1,8 +1,8 @@
-# the login prompt an implementation falls back to when a device is claimed with no command of
-# its own.
+# the command line of a login prompt on a terminal
 #
-# A function file rather than a module, like readiness.nix and shutdown.nix beside it: both
-# implementations need the same command and neither owns it.
+# A function file rather than a module, because more than this module needs it: a virtual
+# machine's serial console is a login prompt too, and wants the same getty the machine's own
+# terminals get whether or not services.getty is enabled.
 {
   pkgs,
   lib,
@@ -68,7 +68,7 @@ let
         extraArgs ? [ ],
       }:
       if autologin != null then
-        throw "providers.ttys: busybox getty has no autologin; use agetty for autologin on ${device}"
+        throw "services.getty: busybox getty has no autologin; use agetty for autologin on ${device}"
       else
         [
           "-l"

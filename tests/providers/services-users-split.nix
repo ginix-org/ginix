@@ -54,17 +54,12 @@
           ${pkgs.coreutils}/bin/chmod 1777 /run/svc-test
           ${pkgs.coreutils}/bin/touch /run/svc-test/shared.ran
         '';
-        requires = [ "sysinit" ];
+        requires = [ "tmpfiles-setup" ];
       };
 
       providers.services.users.alice.units = {
         agent = {
           type.service.command = whoami "alice-agent";
-
-          # `requires` defaults to the first trunk level, which is a system unit - so a user
-          # unit under this rule has to opt out of it explicitly. see the note in the test
-          # header: the default is scope-blind and should not be.
-          requires = [ ];
         };
 
         # only edges within alice's own tree are available here - `shared` would be refused
@@ -84,7 +79,7 @@
       machine.wait_for_console_text("entering runlevel 2")
 
       with subtest("her tree was written out for her own supervisor"):
-          for unit in ["agent", "helper", "boot", "start"]:
+          for unit in ["agent", "helper", "boot"]:
               machine.succeed(f"test -e /etc/dinit-user/alice/{unit}")
 
           # and not into the system supervisor's own configuration

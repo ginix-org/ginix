@@ -49,14 +49,14 @@ in
       description = "load console keymap";
 
       # `conditions = "dev/console"` was finit waiting for the device node, and this replaced it
-      # with a tier - on the reasoning that the device manager puts /dev/console there. It does
-      # not: /dev/console is devtmpfs, which the kernel populates and the init mounts before any
-      # unit runs. So there is nothing here to wait for beyond the trunk, and naming a device
+      # with an early tier - on the reasoning that the device manager puts /dev/console there. It
+      # does not: /dev/console is devtmpfs, which the kernel populates and the init mounts before
+      # any unit runs. So there is nothing here to wait for at all, and naming a device
       # manager would be naming something this has never needed.
-      requires = [ "sysinit" ];
+      requires = [ ];
 
       # reported rather than fatal, like the finit task this was: nothing waited on a task, but
-      # every level above `sysinit` waits on a unit, and a console which will not take a keymap
+      # a failed oneshot holds whatever requires it, and a console which will not take a keymap
       # is not a reason to stop booting - it is a reason to say so and carry on with us.
       type.oneshot.command = pkgs.writeShellScript "loadkmap" ''
         ${pkgs.busybox}/bin/loadkmap < ${cfg.binaryKeyMap} ||
@@ -71,12 +71,12 @@ in
       {
         description = "turn vesa screen blanking ${value}";
 
-        # the logger is in the head tier, which `sysinit` is already behind
-        requires = [ "sysinit" ];
+        # after the logger, where there is one, so what this says is somewhere
+        requires = config.providers.services.lib.present [ "syslogd" ];
 
         # plenty of consoles have no VESA blanking to turn ${value}, and on those setvesablank
         # fails. That was a line in the log when this was a finit task; as a unit it would hold
-        # every level above `sysinit`, which is a heavy price for a screensaver.
+        # whatever required it, which is a heavy price for a screensaver.
         type.oneshot.command = pkgs.writeShellScript "setvesablank" ''
           ${pkgs.kbd}/bin/setvesablank ${value} ||
             echo "setvesablank: this console does not support blanking; continuing" >&2
@@ -86,12 +86,12 @@ in
     providers.services.units.console-setup = lib.mkIf (cfg.font != null || cfg.colors != [ ]) {
       description = "set console font and colors";
 
-      # `runlevels = "S"` with a condition on syslogd is `sysinit` here: the logger is in the
-      # head tier, which this is already behind
-      requires = [ "sysinit" ];
+      # `runlevels = "S"` with a condition on syslogd: after the logger, where there is one, so
+      # what this says is somewhere
+      requires = config.providers.services.lib.present [ "syslogd" ];
 
       # a font this console will not take is not a reason to stop booting - and as a unit it
-      # would be, since every level above `sysinit` waits for this one. Same bargain as
+      # would hold whatever required it. Same bargain as
       # setvesablank and loadkmap beside it.
       type.oneshot.command = pkgs.writeShellScript "console-setup" ''
         ${lib.optionalString (cfg.font != null) setfontCmd}

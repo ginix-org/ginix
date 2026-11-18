@@ -16,7 +16,7 @@ in
   config = lib.mkIf cfg.enable {
     providers.services.units.acpid = {
       description = "acpi daemon";
-      requires = [ "basic" ];
+      requires = [ "tmpfiles-setup" ] ++ config.providers.services.lib.present [ "syslogd" ];
 
       # `--foreground`, so the process running is the whole of what any backend can observe
       type.service.command = "${pkgs.acpid}/bin/acpid --foreground --netlink";

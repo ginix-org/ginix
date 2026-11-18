@@ -17,8 +17,9 @@ in
     providers.services.units.lactd = {
       description = "LACT GPU control daemon";
 
-      # `After=multi-user.target` in the unit lact ships.
-      requires = [ "multi-user" ];
+      # `After=multi-user.target` in the unit lact ships, which here is what it actually uses:
+      # its state and the logger.
+      requires = [ "tmpfiles-setup" ] ++ config.providers.services.lib.present [ "syslogd" ];
 
       # `Nice=-10` in that unit, which the contract has no word for, so it is
       # said to the process instead. A GPU control daemon losing the CPU is a

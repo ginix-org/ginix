@@ -17,13 +17,12 @@ in
     providers.services.units.modprobe = {
       description = "load the configured kernel modules";
 
-      # the head of the trunk: a driver anything later needs should be in the kernel by the
-      # time that thing starts
-      requires = [ (lib.head config.providers.services.trunk.levels) ];
+      # requires nothing, so it starts with the boot. A daemon wanting a driver loaded names this
+      # unit, and a device appearing is the device manager's - `devices-settled`.
 
       # one at a time, and a module which will not load is reported rather than fatal. As a
       # finit task nothing waited on this, so a missing module was a line in the log; as a
-      # unit at the head of the trunk every level above waits for it, and `modprobe -a`
+      # unit whatever requires it waits for it, and `modprobe -a`
       # returning non-zero for one absent module would hold the entire boot.
       type.oneshot.command = pkgs.writeShellScript "load-kernel-modules" ''
         for module in ${lib.escapeShellArgs config.boot.kernelModules}; do

@@ -38,13 +38,13 @@
       # answers about these exactly as it did before.
       providers.services.units.allowed-port = {
         description = "listener on allowed port";
-        requires = [ "basic" ];
+        requires = [ "tmpfiles-setup" ];
         type.service.command = "${pkgs.nmap}/bin/ncat -k -l 8080";
       };
 
       providers.services.units.blocked-port = {
         description = "listener on blocked port";
-        requires = [ "basic" ];
+        requires = [ "tmpfiles-setup" ];
         type.service.command = "${pkgs.nmap}/bin/ncat -k -l 8081";
       };
     };
@@ -95,9 +95,9 @@
 
     # the subtest which stood here left runlevel 2 to stop the firewall, because the ruleset was
     # loaded by a finit task pinned to that runlevel. It is a contract unit now: it comes up
-    # with the trunk, and the unloading is `nftables-flush` on the shutdown side, which runs
+    # with the boot, and the unloading is `nftables-flush`, a shutdown unit, which runs
     # when the machine goes down rather than when it changes runlevel. There is no runlevel to
-    # leave any more, and that the shutdown side runs at all is what tests/providers/core's
+    # leave any more, and that the shutdown units run at all is what tests/providers/core's
     # shutdown test covers on all four implementations.
     #
     # What can still be said here is that the two halves are inverses, which is the property

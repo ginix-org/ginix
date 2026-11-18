@@ -28,8 +28,8 @@ in
     providers.services.units.sysctl = {
       description = "apply kernel variables";
 
-      # the head of the trunk: anything started after this should see the values it sets
-      requires = [ (lib.head config.providers.services.trunk.levels) ];
+      # requires nothing, so it starts with the boot. A daemon which reads a value it sets -
+      # forwarding, a buffer size - names this unit.
 
       # the generated file directly, not `config.environment.etc.<...>.source`. Most
       # implementations lower a unit into /etc, so a unit whose command reads back out of
@@ -37,8 +37,8 @@ in
       # rather than as anything a person could read.
       #
       # `-e` because a key the running kernel does not have is not a reason to stop booting.
-      # As a finit task this was free - nothing waited on a task - but a unit at the head of
-      # the trunk is waited for by every level above it, so one stale entry in
+      # As a finit task this was free - nothing waited on a task - but a unit is waited for by
+      # whatever requires it, so one stale entry in
       # boot.kernel.sysctl would otherwise take the whole machine down with it.
       type.oneshot.command = "${pkgs.procps}/bin/sysctl -e -p ${sysctlConf}";
     };

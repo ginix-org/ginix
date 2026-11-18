@@ -49,7 +49,7 @@
         {
           first = {
             type.service.command = recorder "first";
-            requires = [ "sysinit" ];
+            requires = [ "tmpfiles-setup" ];
           };
 
           second = {
@@ -82,7 +82,7 @@
         machine.wait_until_succeeds("test -d /run/service/first/supervise", timeout=60)
 
     with subtest("every unit reached its latch"):
-        for unit in ["start", "sysinit", "first", "second", "third"]:
+        for unit in ["tmpfiles-setup", "first", "second", "third"]:
             machine.wait_until_succeeds(
                 f"test -e /run/providers-services/{unit}.ready", timeout=60
             )

@@ -40,7 +40,7 @@ let
       # in both generations, unchanged: nothing about it differs, so nothing should happen to it
       keeper = {
         type.service.command = daemon "keeper";
-        requires = [ "sysinit" ];
+        requires = [ "tmpfiles-setup" ];
       };
     };
   };
@@ -55,7 +55,7 @@ let
       # and one which only exists there
       newcomer = {
         type.service.command = daemon "newcomer";
-        requires = [ "sysinit" ];
+        requires = [ "tmpfiles-setup" ];
       };
     };
   };
@@ -72,7 +72,7 @@ in
 
       providers.services.units.goner = {
         type.service.command = daemon "goner";
-        requires = [ "sysinit" ];
+        requires = [ "tmpfiles-setup" ];
       };
     };
 
@@ -82,7 +82,9 @@ in
         return out.strip() if code == 0 else None
 
     machine.start()
-    machine.wait_until_succeeds("test -e /run/providers-services/running.ready", timeout=240)
+    # the units under test having latched, which is what the subtests below are about
+    for unit in ["keeper", "goner"]:
+        machine.wait_until_succeeds(f"test -e /run/providers-services/{unit}.ready", timeout=240)
 
     with subtest("the first generation's services are up"):
         machine.wait_until_succeeds("pgrep -f '[f]inix-daemon-keeper'", timeout=60)
@@ -117,9 +119,9 @@ in
             f"keeper was restarted: {keeper_before} -> {keeper_after}"
         )
 
-    with subtest("the trunk is intact"):
-        machine.succeed("test -e /run/providers-services/running.ready")
-        machine.succeed("test -e /run/providers-services/multi-user.ready")
+    with subtest("everything else is intact"):
+        machine.succeed("test -e /run/providers-services/tmpfiles-setup.ready")
+        machine.succeed("test -e /run/providers-services/mount-filesystems.ready")
 
     machine.shutdown()
   '';

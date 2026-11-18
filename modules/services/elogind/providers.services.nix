@@ -17,15 +17,15 @@ in
     providers.services.units.elogind = {
       description = "login manager";
 
-      # `sysinit`, beside seatd and the bus: seat and session management is infrastructure that
-      # the tier above is entitled to assume, in the same way it assumes logging and device
-      # nodes. Anything in a later tier - a login prompt, polkit - is then after it by the
-      # trunk rather than by naming it, and naming it would have meant an optional edge, which
-      # hides a requirement rather than stating it.
-      #
-      # Nothing about the bus either: it and its socket gate are in the head tier, and this is
-      # in the one after, so it is already behind both.
-      requires = [ "sysinit" ];
+      # the bus, which is how it is reached, the logger, and /run, where it keeps sessions.
+      # Anything which wants a session tracked names this unit - a login prompt, polkit.
+      requires = [
+        "tmpfiles-setup"
+      ]
+      ++ config.providers.services.lib.present [
+        "dbus"
+        "syslogd"
+      ];
 
       # elogind reads these from fixed paths under /etc and names them nowhere, so without
       # this a changed configuration leaves the daemon running with the old one. Declared

@@ -20,8 +20,8 @@ in
       description = "tlp system startup";
 
       # early, like the runlevel S this used to sit in: the power policy should be in place
-      # before the machine has much running to spend power on
-      requires = [ "sysinit" ];
+      # before the machine has much running to spend power on. Its state is all it needs.
+      requires = [ "tmpfiles-setup" ];
 
       # three finit stanzas reduce to this one. `tlp@reload` ran `tlp start` and existed only
       # so that a changed tlp.conf would be applied - which the stanza arranged by mentioning

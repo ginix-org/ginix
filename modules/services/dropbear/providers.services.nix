@@ -19,8 +19,8 @@ in
     providers.services.units.dropbear-keygen = {
       description = "generate ssh host keys";
 
-      # before anything can serve with them, and before the tier which completes `basic`
-      requires = [ "sysinit" ];
+      # before anything can serve with them, and after the filesystem they are kept on
+      requires = [ "tmpfiles-setup" ];
 
       type.oneshot.command =
         let
@@ -38,13 +38,16 @@ in
     providers.services.units.dropbear = {
       description = "dropbear ssh daemon";
 
-      # `basic`, where the rest of the network daemons are. `net/lo/up` and
-      # `service/syslogd/ready` are both behind it - loopback and the logger come up in the
-      # tier which completes `basic` - so only the keys still need naming, and they are named
-      # because a daemon serving before they exist offers a host identity it then changes.
+      # the keys, because a daemon serving before they exist offers a host identity it then
+      # changes; the logger, which is what `service/syslogd/ready` said; and the firewall where
+      # there is one, since this is the machine listening.
       requires = [
-        "basic"
+        "tmpfiles-setup"
         "dropbear-keygen"
+      ]
+      ++ config.providers.services.lib.present [
+        "syslogd"
+        "nftables"
       ];
 
       type.service.command = "${cfg.package}/bin/dropbear -F " + lib.escapeShellArgs cfg.extraArgs;

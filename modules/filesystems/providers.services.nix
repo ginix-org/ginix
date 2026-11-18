@@ -40,9 +40,9 @@ let
         {
           description = "Encrypted swap device on ${sw.device}";
 
-          # `runlevels = "S"` was finit's earliest; here that is the tier after the device
-          # managers, which is what has to have run before there is a device to encrypt
-          requires = [ "sysinit" ];
+          # `runlevels = "S"` was finit's earliest; what it has to come after is the device
+          # manager having made the device nodes, or there is no device to encrypt
+          requires = config.providers.services.lib.present [ "devices-settled" ];
 
           type.oneshot.command = toString (
             pkgs.writeShellScript name ''
@@ -89,12 +89,11 @@ in
       (lib.mkIf (plainSwapDevices != [ ]) {
         swap = {
           description = "swap devices from fstab";
-          requires = [ "mount-filesystems" ];
-          # tolerant, because the contract attaches this to a level and a failed oneshot holds
-          # its dependants - so a swapfile that was never `mkswap`'d, or one btrfs refuses
-          # because it was made without `nocow`, would stop the boot. A machine with no swap
-          # boots fine; a machine that will not boot because of swap is a worse outcome than
-          # the thing being reported. So it says so and carries on.
+          requires = config.providers.services.lib.present [ "mount-filesystems" ];
+          # tolerant, because a failed oneshot holds its dependants - so a swapfile that was never
+          # `mkswap`'d, or one btrfs refuses because it was made without `nocow`, would stop the
+          # boot. A machine with no swap boots fine; a machine that will not boot because of swap
+          # is a worse outcome than the thing being reported. So it says so and carries on.
           type.oneshot.command = toString (
             pkgs.writeShellScript "swapon-fstab" ''
               if ! ${pkgs.util-linuxMinimal}/bin/swapon -a; then

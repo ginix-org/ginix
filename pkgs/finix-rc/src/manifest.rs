@@ -56,9 +56,9 @@ pub struct Unit {
 
     pub kind: Kind,
 
-    /// `None` for an anchor, which is a name to synchronise on and has nothing to run.
-    #[serde(default)]
-    pub command: Option<String>,
+    /// what the job runs. Every kind runs something: a unit with nothing to run is not one the
+    /// contract can declare.
+    pub command: String,
 
     #[serde(default)]
     pub user: Option<String>,
@@ -83,8 +83,6 @@ pub struct Unit {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Kind {
-    /// a name with nothing behind it: latch and exit.
-    Anchor,
     /// runs once and is expected to finish. Latches on success and only on success.
     Oneshot,
     /// runs until stopped, and is restarted if it stops on its own.

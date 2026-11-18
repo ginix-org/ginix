@@ -6,21 +6,11 @@
 }:
 let
   cfg = config.providers.services;
-  trunk = cfg.trunk;
 
   # `depends-ms` is a milestone dependency - the named service must start successfully once,
   # and may stop afterwards without affecting this one - which is exactly an edge that gates
-  # starting and nothing else. the finit backend has to fake it.
-  #
-  # An anchor is a scripted unit running `true` rather than dinit.s own process-less
-  # `internal`, which it could use. An anchor means the same thing on every backend and there
-  # is no reason for it to behave differently on this one: `internal` has its own rules about
-  # stopping and restarting, and a trunk level built out of it would not be the same object as
-  # the trunk level next door. The cost is one `true` per level, at the moment it is reached.
-  type = {
-    anchor = "scripted";
-    oneshot = "scripted";
-  };
+  # starting and nothing else, which the finit backend has to fake. It is the edge every unit
+  # here is wired with.
 
   kindOf = unit: lib.head (lib.attrNames unit.type);
   variantOf = unit: unit.type.${kindOf unit};
@@ -77,8 +67,8 @@ let
 
   typeOf =
     unit:
-    if kindOf unit != "service" then
-      type.${kindOf unit}
+    if kindOf unit == "oneshot" then
+      "scripted"
     else if waitKindOf unit == "pidfile" then
       "bgprocess"
     else
@@ -160,10 +150,6 @@ let
       default = true;
     }
     // lib.optionalAttrs (commandOf name unit != null) { command = commandOf name unit; }
-
-    # an anchor has no command of its own, and a scripted unit without one is not a unit. The
-    # `true` is the whole of it: reached, therefore started.
-    // lib.optionalAttrs (kindOf unit == "anchor") { command = true'; }
 
     // lib.optionalAttrs (unit.user != null) { run-as = unit.user; }
     // lib.optionalAttrs (unit.environment != { }) { environment = unit.environment; }
@@ -319,18 +305,6 @@ let
           lib.attrNames u.units
           ++ map waitNameOf (lib.attrNames (lib.filterAttrs (_: needsWaitUnit) u.units));
       };
-
-      # the head of the trunk, in this user's namespace.
-      #
-      # `requires` defaults to the head of the tree a unit is in, and the unit type is shared with
-      # the system's, so a user unit which said nothing about ordering named this. It is an anchor
-      # there and an anchor here: something to attach to, which is reached immediately because it
-      # waits for nothing.
-      "${userDir user}/${lib.head cfg.trunk.levels}".source =
-        settingsFormat.generate (lib.head cfg.trunk.levels)
-          {
-            type = "internal";
-          };
     };
 
 in
@@ -635,7 +609,7 @@ in
         user: _:
         lib.nameValuePair "user-services-dir--${user}" {
           description = "control socket directory for ${user}";
-          requires = [ "sysinit" ];
+          requires = [ "tmpfiles-setup" ];
           type.oneshot.command = pkgs.writeShellScript "user-services-dir-${user}" ''
             ${lib.getExe' pkgs.coreutils "mkdir"} -p ${socketDir user}
             ${lib.getExe' pkgs.coreutils "chown"} ${user} ${socketDir user}

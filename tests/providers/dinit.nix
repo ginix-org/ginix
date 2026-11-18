@@ -35,16 +35,6 @@
       # supervises the units and dinit is what the kernel starts.
       providers.services.backend = "dinit";
 
-      # `boot` is dinit's own root service, so the trunk's first level cannot use that name
-      # here - both would be written to /etc/dinit.d/boot.
-      providers.services.trunk.levels = [
-        "start"
-        "sysinit"
-        "basic"
-        "multi-user"
-        "running"
-      ];
-
       providers.services.units = {
         early = {
           type.oneshot.command = pkgs.writeShellScript "early" ''
@@ -52,12 +42,12 @@
             mkdir -p /run/svc-test
             touch /run/svc-test/early.ran
           '';
-          requires = [ "start" ];
+          requires = [ ];
         };
 
         alpha = {
           type.service.command = daemon "alpha";
-          requires = [ "sysinit" ];
+          requires = [ "tmpfiles-setup" ];
         };
 
         # the start-only edge under test: alpha is a milestone dependency, so stopping alpha
@@ -69,7 +59,7 @@
 
         gamma = {
           type.service.command = daemon "gamma";
-          requires = [ "basic" ];
+          requires = [ "tmpfiles-setup" ];
         };
 
         # two shutdown units, the second requiring the first so their order is unambiguous
@@ -99,13 +89,7 @@
     # dinit reaching its boot service is the same gate and is what this asks for instead.
     machine.wait_until_succeeds("dinitctl status boot | grep -q STARTED", timeout=120)
 
-    with subtest("trunk levels came up as native internal services"):
-        for level in ["start", "sysinit", "basic", "multi-user", "running"]:
-            machine.wait_until_succeeds(
-                f"dinitctl status {level} | grep -q 'State: STARTED'"
-            )
-
-    with subtest("units attached to the trunk started"):
+    with subtest("the units started"):
         machine.succeed("test -f /run/svc-test/early.ran")
         for svc in ["alpha", "beta", "gamma"]:
             machine.wait_until_succeeds(f"dinitctl status {svc} | grep -q 'State: STARTED'")

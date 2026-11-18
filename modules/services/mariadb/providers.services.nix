@@ -21,9 +21,9 @@ in
 
       description = "mariadb database init";
 
-      # before the tier which completes `basic`, so the database it creates is there for the
-      # daemon which serves it
-      requires = [ "sysinit" ];
+      # the data directory, which is on a mounted filesystem; and the daemon which serves the
+      # database it creates names this unit
+      requires = [ "tmpfiles-setup" ];
 
       type.oneshot.command = pkgs.writeShellApplication {
         name = "mariadb-init.sh";
@@ -46,10 +46,14 @@ in
 
       description = "mariadb database service";
 
-      # the logger is behind the tier which completes `basic`; the init is not, so it is named
+      # the database, the logger, and the firewall where there is one
       requires = [
-        "basic"
+        "tmpfiles-setup"
         "mariadb-init"
+      ]
+      ++ config.providers.services.lib.present [
+        "syslogd"
+        "nftables"
       ];
 
       # a database flushing its buffer pool on the way out is the case this option exists for
