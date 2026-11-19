@@ -6,7 +6,8 @@
 # that is a judgement, and it is made by looking at one.
 #
 # So what is asserted here is the part which is not a judgement: that every shape the chart has
-# a rule for appears when the configuration calls for it, that an edge is drawn as declared, and
+# a rule for appears when the configuration calls for it, that an edge is drawn as declared
+# unless a longer path already implies it, and
 # that the one claim the chart makes on its own - "this unit starts with the boot, waiting for
 # nothing" - is made only when it is true.
 {
@@ -99,6 +100,10 @@ let
     {
       line = "subgraph";
       why = "the graph is drawn as it is - units, and the edges between them - with nothing boxed, grouped or collapsed";
+    }
+    {
+      line = "u_tmpfiles_setup --> u_after_demo";
+      why = "an edge a longer path implies is left out: after-demo requires tmpfiles-setup, but through demo already";
     }
     {
       line = "g_start -.-> u_demo";

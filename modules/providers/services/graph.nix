@@ -102,11 +102,35 @@ let
     in
     shapeFor (kindOf unit) (unitId name) label;
 
-  # every edge the configuration declared, drawn as declared - there is nothing to collapse or
-  # group, and grouping it was the thing which made the first version of this unreadable
-  edgesOf =
-    name: unit:
-    map (dep: "  ${unitId dep} --> ${unitId name}") (lib.filter (dep: enabled ? ${dep}) unit.requires);
+  # the edges worth drawing among `units`, as { from, to } pairs: every declared one except those
+  # a longer path already implies.
+  #
+  # Modules rightly name everything they need - a daemon requires `tmpfiles-setup` even when it
+  # also requires `dbus`, which requires `tmpfiles-setup` itself - and drawn as declared that is a
+  # fan of lines out of every early unit which says nothing the longer path does not. On a
+  # desktop it was two edges in five. So the picture is the transitive reduction: an edge is
+  # left out when its source is already an ancestor of one of the unit's other dependencies. The
+  # order it shows is exactly the configuration's.
+  #
+  # `ancestors` is an attrset, so each unit's is computed once however often it is asked for.
+  reducedEdges =
+    units:
+    let
+      depsOf = name: lib.unique (lib.filter (dep: units ? ${dep}) units.${name}.requires);
+      ancestors = lib.mapAttrs (
+        name: _: lib.unique (lib.concatMap (dep: [ dep ] ++ ancestors.${dep}) (depsOf name))
+      ) units;
+      implied = name: dep: lib.any (other: other != dep && lib.elem dep ancestors.${other}) (depsOf name);
+    in
+    lib.concatLists (
+      lib.mapAttrsToList (
+        name: _:
+        map (dep: {
+          from = dep;
+          to = name;
+        }) (lib.filter (dep: !(implied name dep)) (depsOf name))
+      ) units
+    );
 
   roots = lib.attrNames (lib.filterAttrs (_: isRoot) enabled);
   firstDown = lib.attrNames (lib.filterAttrs (_: isFirstDown) enabled);
@@ -148,12 +172,7 @@ let
       name: unit: "    ${shapeFor (kindOf unit) (nid name) ''"${name}<br/>${kindOf unit}"''}"
     ) units
     ++ map (r: "    ${sessionId} -.-> ${nid r}") treeRoots
-    ++ lib.concatLists (
-      lib.mapAttrsToList (
-        name: unit:
-        map (dep: "    ${nid dep} --> ${nid name}") (lib.filter (dep: units ? ${dep}) unit.requires)
-      ) units
-    )
+    ++ map (e: "    ${nid e.from} --> ${nid e.to}") (reducedEdges units)
     ++ [ "  end" ];
 
   mermaid = lib.concatStringsSep "\n" (
@@ -184,11 +203,18 @@ let
     ++ [ "" ]
     ++ map (r: "  ${startId} -.-> ${unitId r}") roots
     ++ map (r: "  ${stopId} -.-> ${unitId r}") firstDown
-    ++ lib.concatLists (lib.mapAttrsToList edgesOf enabled)
+    ++ map (e: "  ${unitId e.from} --> ${unitId e.to}") (reducedEdges enabled)
     ++ [ "" ]
 
-    # the per-user trees last, so the system graph reads top to bottom before them
     ++ lib.concatLists (lib.mapAttrsToList userTree cfg.users)
+    ++ [ "" ]
+
+    # an invisible link from each user tree's entry to the system's. Not an ordering - there is
+    # none between the two graphs, and nothing is drawn - but a hint to the layout, which
+    # otherwise has no reason to keep them apart: with no edge between them it set the tree
+    # down in the same columns as the boot's first units, over `start` and its edges. Linked,
+    # the tree is laid out before the system and the two stack.
+    ++ map (user: "  ${idOf "s_" user}_g_session ~~~ ${startId}") (lib.attrNames cfg.users)
     ++ [ "" ]
   );
 in
