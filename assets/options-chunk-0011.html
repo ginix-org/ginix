@@ -1,155 +1,3 @@
-<div class="option" id="option-providers.services.user.waylandSessionEnv">
-  <h3 class="option-name">
-    <a href="#option-providers.services.user.waylandSessionEnv" class="option-anchor">providers.services.user.waylandSessionEnv</a>
-    <button type="button" class="copy-link" aria-label="Copy link to this option" title="Copy link to this option"></button>
-    <span class="copy-feedback">Link copied!</span>
-  </h3>
-  <div class="option-metadata"><span class="option-badge">read-only</span></div>
-  <div class="option-description"><html><head></head><body><p>A <code>--session-env</code> for any wayland compositor which binds a <code>wayland-N</code> socket in
-<code>$XDG_RUNTIME_DIR</code>: it succeeds once there is one, printing <code>WAYLAND_DISPLAY</code>.</p>
-<p>It takes the lowest-numbered socket, so it is only right while the user has one
-graphical session.</p>
-</body></html></div>
-  <dl class="option-details">
-    <dt>Type</dt><dd class="option-value"><code>package</code></dd>
-    <dt>Default</dt><dd class="option-value"><html><head></head><body><p>a generated script</p>
-</body></html></dd>
-  </dl>
-  <dl class="option-details option-sources">
-    <dt>Declared in</dt><dd class="option-value"><code><a href="https://github.com/finix-community/finix/blob/main/modules/providers/services/users.nix" target="_blank" rel="noopener noreferrer">&lt;finix/modules/providers/services/users.nix&gt;</a></code></dd>
-  </dl>
-</div>
-<div class="option" id="option-providers.services.users">
-  <h3 class="option-name">
-    <a href="#option-providers.services.users" class="option-anchor">providers.services.users</a>
-    <button type="button" class="copy-link" aria-label="Copy link to this option" title="Copy link to this option"></button>
-    <span class="copy-feedback">Link copied!</span>
-  </h3>
-  <div class="option-description"><html><head></head><body><p>Per-user service trees, one per user.</p>
-<p>A user's units are written as if that user were the only thing on the machine, and are
-the only things they may depend on: the supervisor running them is that user's own and
-cannot observe the system's units, so an edge naming one is refused rather than silently
-never satisfied. Anything a tree needs from the system belongs earlier in the trunk,
-where it is up before any session can start.</p>
-<p>These start with a session and stop with it, which is what separates them from a system
-unit that merely runs as a user - <a class="option-reference" href="options.html#option-providers.services.units"><code class="nixos-option">providers.services.units</code></a> with <code>user</code> set is
-still the way to say that.</p>
-</body></html></div>
-  <dl class="option-details">
-    <dt>Type</dt><dd class="option-value"><code>attribute set of (submodule)</code></dd>
-    <dt>Default</dt><dd class="option-value"><html><head></head><body><html><head></head><body><pre class="highlight"><code class="language-nix"><span style="color:rgb(132,139,152);">{</span>&nbsp;<span style="color:rgb(132,139,152);">}</span></code></pre></body></html>
-</body></html></dd>
-  </dl>
-  <dl class="option-details option-sources">
-    <dt>Declared in</dt><dd class="option-value"><code><a href="https://github.com/finix-community/finix/blob/main/modules/providers/services/users.nix" target="_blank" rel="noopener noreferrer">&lt;finix/modules/providers/services/users.nix&gt;</a></code></dd>
-  </dl>
-</div>
-<div class="option" id="option-providers.services.users._name_.sessionVariables">
-  <h3 class="option-name">
-    <a href="#option-providers.services.users._name_.sessionVariables" class="option-anchor">providers.services.users.&lt;name&gt;.sessionVariables</a>
-    <button type="button" class="copy-link" aria-label="Copy link to this option" title="Copy link to this option"></button>
-    <span class="copy-feedback">Link copied!</span>
-  </h3>
-  <div class="option-description"><html><head></head><body><p>Environment variables for this user's whole session - the payload the launcher
-runs, the supervisor beside it, and everything either of them starts.</p>
-<p>Set before the payload, so that what a compositor spawns inherits them.
-<code class="nixos-option">providers.services.user.sessionLauncherEnv</code> is for the other case, a
-value only knowable once the session is running.</p>
-<p>A value may refer to other variables, so one can extend itself the way
-<code>environment.d(5)</code> allows: <code>$XDG_CONFIG_DIRS</code>, <code>${XDG_CONFIG_DIRS}</code>,
-<code>${XDG_CONFIG_DIRS:+:$XDG_CONFIG_DIRS}</code> and the <code>:-</code> form all do what they look
-like, resolved against the session's environment and against the variables set
-before this one.</p>
-<p>Those four forms are the whole of it. The launcher substitutes them itself and has
-no shell, so a value containing a command substitution is the text it is written
-as rather than a command that runs - which is the one way the shell this replaced
-could have been made to do something. A <code>$</code> that begins none of the four is a
-literal <code>$</code>, and there is no way to write one that would.</p>
-</body></html></div>
-  <dl class="option-details">
-    <dt>Type</dt><dd class="option-value"><code>attribute set of ((string or absolute path convertible to it) or signed integer convertible to it)</code></dd>
-    <dt>Default</dt><dd class="option-value"><html><head></head><body><html><head></head><body><pre class="highlight"><code class="language-nix"><span style="color:rgb(132,139,152);">{</span>&nbsp;<span style="color:rgb(132,139,152);">}</span></code></pre></body></html>
-</body></html></dd>
-    <dt>Example</dt><dd class="option-value"><html><head></head><body><html><head></head><body><pre class="highlight"><code class="language-nix"><span style="color:rgb(132,139,152);">{</span><br>&nbsp;&nbsp;<span style="color:rgb(86,182,194);">QT_QPA_PLATFORMTHEME</span>&nbsp;<span style="color:rgb(171,178,191);">=</span>&nbsp;<span style="color:rgb(152,195,121);">"</span><span style="color:rgb(152,195,121);">qt5ct</span><span style="color:rgb(152,195,121);">"</span><span style="color:rgb(132,139,152);">;</span><br><span style="color:rgb(132,139,152);">}</span></code></pre></body></html>
-</body></html></dd>
-  </dl>
-  <dl class="option-details option-sources">
-    <dt>Declared in</dt><dd class="option-value"><code><a href="https://github.com/finix-community/finix/blob/main/modules/providers/services/users.nix" target="_blank" rel="noopener noreferrer">&lt;finix/modules/providers/services/users.nix&gt;</a></code></dd>
-  </dl>
-</div>
-<div class="option" id="option-providers.services.users._name_.units">
-  <h3 class="option-name">
-    <a href="#option-providers.services.users._name_.units" class="option-anchor">providers.services.users.&lt;name&gt;.units</a>
-    <button type="button" class="copy-link" aria-label="Copy link to this option" title="Copy link to this option"></button>
-    <span class="copy-feedback">Link copied!</span>
-  </h3>
-  <div class="option-description"><html><head></head><body><p>This user's units. See <a class="option-reference" href="options.html#option-providers.services.units"><code class="nixos-option">providers.services.units</code></a>.</p>
-</body></html></div>
-  <dl class="option-details">
-    <dt>Type</dt><dd class="option-value"><code>attribute set of (submodule)</code></dd>
-    <dt>Default</dt><dd class="option-value"><html><head></head><body><html><head></head><body><pre class="highlight"><code class="language-nix"><span style="color:rgb(132,139,152);">{</span>&nbsp;<span style="color:rgb(132,139,152);">}</span></code></pre></body></html>
-</body></html></dd>
-  </dl>
-  <dl class="option-details option-sources">
-    <dt>Declared in</dt><dd class="option-value"><code><a href="https://github.com/finix-community/finix/blob/main/modules/providers/services/users.nix" target="_blank" rel="noopener noreferrer">&lt;finix/modules/providers/services/users.nix&gt;</a></code></dd>
-  </dl>
-</div>
-<div class="option" id="option-providers.services.users._name_.units._name_.enable">
-  <h3 class="option-name">
-    <a href="#option-providers.services.users._name_.units._name_.enable" class="option-anchor">providers.services.users.&lt;name&gt;.units.&lt;name&gt;.enable</a>
-    <button type="button" class="copy-link" aria-label="Copy link to this option" title="Copy link to this option"></button>
-    <span class="copy-feedback">Link copied!</span>
-  </h3>
-  <div class="option-description"><html><head></head><body><p>Whether this unit is part of the system.</p>
-<p>A disabled unit is not emitted at all, and is stopped on the next
-reconciliation if it happens to be running. Units which require it are left
-waiting, since the thing they require will never become ready - so disabling
-a unit something else depends on is a way to stall that branch of the graph,
-not a way to prune it.</p>
-</body></html></div>
-  <dl class="option-details">
-    <dt>Type</dt><dd class="option-value"><code>boolean</code></dd>
-    <dt>Default</dt><dd class="option-value"><html><head></head><body><html><head></head><body><pre class="highlight"><code class="language-nix"><span style="color:rgb(209,154,102);">true</span></code></pre></body></html>
-</body></html></dd>
-  </dl>
-  <dl class="option-details option-sources">
-    <dt>Declared in</dt><dd class="option-value"><code><a href="https://github.com/finix-community/finix/blob/main/modules/providers/services" target="_blank" rel="noopener noreferrer">&lt;finix/modules/providers/services&gt;</a></code></dd>
-  </dl>
-</div>
-<div class="option" id="option-providers.services.users._name_.units._name_.description">
-  <h3 class="option-name">
-    <a href="#option-providers.services.users._name_.units._name_.description" class="option-anchor">providers.services.users.&lt;name&gt;.units.&lt;name&gt;.description</a>
-    <button type="button" class="copy-link" aria-label="Copy link to this option" title="Copy link to this option"></button>
-    <span class="copy-feedback">Link copied!</span>
-  </h3>
-  <div class="option-description"><html><head></head><body><p>A short human-readable description of this unit.</p>
-</body></html></div>
-  <dl class="option-details">
-    <dt>Type</dt><dd class="option-value"><code>string</code></dd>
-  </dl>
-  <dl class="option-details option-sources">
-    <dt>Declared in</dt><dd class="option-value"><code><a href="https://github.com/finix-community/finix/blob/main/modules/providers/services" target="_blank" rel="noopener noreferrer">&lt;finix/modules/providers/services&gt;</a></code></dd>
-  </dl>
-</div>
-<div class="option" id="option-providers.services.users._name_.units._name_.environment">
-  <h3 class="option-name">
-    <a href="#option-providers.services.users._name_.units._name_.environment" class="option-anchor">providers.services.users.&lt;name&gt;.units.&lt;name&gt;.environment</a>
-    <button type="button" class="copy-link" aria-label="Copy link to this option" title="Copy link to this option"></button>
-    <span class="copy-feedback">Link copied!</span>
-  </h3>
-  <div class="option-description"><html><head></head><body><p>Environment variables passed to this unit's process.</p>
-</body></html></div>
-  <dl class="option-details">
-    <dt>Type</dt><dd class="option-value"><code>attribute set of string</code></dd>
-    <dt>Default</dt><dd class="option-value"><html><head></head><body><html><head></head><body><pre class="highlight"><code class="language-nix"><span style="color:rgb(132,139,152);">{</span>&nbsp;<span style="color:rgb(132,139,152);">}</span></code></pre></body></html>
-</body></html></dd>
-    <dt>Example</dt><dd class="option-value"><html><head></head><body><html><head></head><body><pre class="highlight"><code class="language-nix"><span style="color:rgb(132,139,152);">{</span><br>&nbsp;&nbsp;<span style="color:rgb(86,182,194);">TZ</span>&nbsp;<span style="color:rgb(171,178,191);">=</span>&nbsp;<span style="color:rgb(152,195,121);">"</span><span style="color:rgb(152,195,121);">CET</span><span style="color:rgb(152,195,121);">"</span><span style="color:rgb(132,139,152);">;</span><br><span style="color:rgb(132,139,152);">}</span></code></pre></body></html>
-</body></html></dd>
-  </dl>
-  <dl class="option-details option-sources">
-    <dt>Declared in</dt><dd class="option-value"><code><a href="https://github.com/finix-community/finix/blob/main/modules/providers/services" target="_blank" rel="noopener noreferrer">&lt;finix/modules/providers/services&gt;</a></code></dd>
-  </dl>
-</div>
 <div class="option" id="option-providers.services.users._name_.units._name_.group">
   <h3 class="option-name">
     <a href="#option-providers.services.users._name_.units._name_.group" class="option-anchor">providers.services.users.&lt;name&gt;.units.&lt;name&gt;.group</a>
@@ -186,41 +34,6 @@ program by name rather than by store path needs to say where to find it.</p>
     <dt>Declared in</dt><dd class="option-value"><code><a href="https://github.com/finix-community/finix/blob/main/modules/providers/services" target="_blank" rel="noopener noreferrer">&lt;finix/modules/providers/services&gt;</a></code></dd>
   </dl>
 </div>
-<div class="option" id="option-providers.services.users._name_.units._name_.reloadTriggers">
-  <h3 class="option-name">
-    <a href="#option-providers.services.users._name_.units._name_.reloadTriggers" class="option-anchor">providers.services.users.&lt;name&gt;.units.&lt;name&gt;.reloadTriggers</a>
-    <button type="button" class="copy-link" aria-label="Copy link to this option" title="Copy link to this option"></button>
-    <span class="copy-feedback">Link copied!</span>
-  </h3>
-  <div class="option-description"><html><head></head><body><p>Files this unit's process reads which are not named anywhere else in the
-unit, listed so that changing one counts as changing the unit.</p>
-<p>A unit's identity is what <code class="nixos-option">providers.services.switch</code> compares across
-a rebuild: the command, the user, the environment, and the rest of what is
-written here. A daemon which reads a configuration file from a fixed path -
-<code>/etc/elogind/logind.conf</code>, say - names it nowhere, so the file can change
-while every one of those stays identical, and the daemon keeps running with
-the configuration it started with. Nothing reports it.</p>
-<p>Naming the file here makes it part of the unit, so the switch acts on it.
-What it does is reload where it can: a changed unit which declares
-<code class="nixos-option">type.service.reload</code> is asked to re-read its own configuration and
-keeps its pid, and only one which cannot is stopped and started. Hence the
-name - a restart is the fallback, not the intent. Whether reloading is
-enough is the unit's claim to make, which is why it is made there.</p>
-<p>Only for what the unit does not otherwise mention. A path which already
-appears in the command - as an argument, or in a generated script - is part
-of the unit by being there, and needs no second statement.</p>
-</body></html></div>
-  <dl class="option-details">
-    <dt>Type</dt><dd class="option-value"><code>list of (absolute path or string)</code></dd>
-    <dt>Default</dt><dd class="option-value"><html><head></head><body><html><head></head><body><pre class="highlight"><code class="language-nix"><span style="color:rgb(132,139,152);">[</span>&nbsp;<span style="color:rgb(132,139,152);">]</span></code></pre></body></html>
-</body></html></dd>
-    <dt>Example</dt><dd class="option-value"><html><head></head><body><html><head></head><body><pre class="highlight"><code class="language-nix"><span style="color:rgb(132,139,152);">[</span>&nbsp;<span style="color:rgb(171,178,191);">config</span><span style="color:rgb(132,139,152);">.</span><span style="color:rgb(86,182,194);">services</span><span style="color:rgb(132,139,152);">.</span><span style="color:rgb(86,182,194);">foo</span><span style="color:rgb(132,139,152);">.</span><span style="color:rgb(86,182,194);">configFile</span>&nbsp;<span style="color:rgb(132,139,152);">]</span></code></pre></body></html>
-</body></html></dd>
-  </dl>
-  <dl class="option-details option-sources">
-    <dt>Declared in</dt><dd class="option-value"><code><a href="https://github.com/finix-community/finix/blob/main/modules/providers/services" target="_blank" rel="noopener noreferrer">&lt;finix/modules/providers/services&gt;</a></code></dd>
-  </dl>
-</div>
 <div class="option" id="option-providers.services.users._name_.units._name_.requires">
   <h3 class="option-name">
     <a href="#option-providers.services.users._name_.units._name_.requires" class="option-anchor">providers.services.users.&lt;name&gt;.units.&lt;name&gt;.requires</a>
@@ -229,115 +42,19 @@ of the unit by being there, and needs no second statement.</p>
   </h3>
   <div class="option-description"><html><head></head><body><p>The units which must be ready before this one starts. Losing one afterwards
 has no effect on this unit.</p>
-<p>At most one of these may be a trunk level - see
-<a class="option-reference" href="options.html#option-providers.services.trunk.levels"><code class="nixos-option">providers.services.trunk.levels</code></a>.</p>
-<p>A unit which requires nothing is attached to the first trunk level instead of
-floating free, so that it still has a place in the tree and the second level
-still waits for it. Setting this to an empty list explicitly opts out.</p>
+<p>Nothing is implied: a unit which requires nothing starts as soon as the system
+does, alongside the filesystems being mounted. A daemon which keeps state
+wants <code>tmpfiles-setup</code>, which is behind the mounts; one which logs wants the
+system logger; one which touches hardware wants <code>devices-settled</code>. Names only
+some machines have - the logger, the device manager's settle, the bus - are
+named through <code class="nixos-option">providers.services.lib.present</code>, so the edge exists
+where the unit does and nowhere else.</p>
+<p>For a <code>shutdown</code> unit these order it among the other shutdown units, and may
+name nothing else.</p>
 </body></html></div>
   <dl class="option-details">
     <dt>Type</dt><dd class="option-value"><code>list of string</code></dd>
-    <dt>Default</dt><dd class="option-value"><html><head></head><body><html><head></head><body><pre class="highlight"><code class="language-nix"><span style="color:rgb(132,139,152);">[</span>&nbsp;<span style="color:rgb(132,139,152);">(</span><span style="color:rgb(171,178,191);">lib</span><span style="color:rgb(132,139,152);">.</span><span style="color:rgb(97,175,239);">head</span>&nbsp;<span style="color:rgb(171,178,191);">config</span><span style="color:rgb(132,139,152);">.</span><span style="color:rgb(86,182,194);">providers</span><span style="color:rgb(132,139,152);">.</span><span style="color:rgb(86,182,194);">services</span><span style="color:rgb(132,139,152);">.</span><span style="color:rgb(86,182,194);">trunk</span><span style="color:rgb(132,139,152);">.</span><span style="color:rgb(86,182,194);">levels</span><span style="color:rgb(132,139,152);">)</span>&nbsp;<span style="color:rgb(132,139,152);">]</span></code></pre></body></html>
-</body></html></dd>
-  </dl>
-  <dl class="option-details option-sources">
-    <dt>Declared in</dt><dd class="option-value"><code><a href="https://github.com/finix-community/finix/blob/main/modules/providers/services" target="_blank" rel="noopener noreferrer">&lt;finix/modules/providers/services&gt;</a></code></dd>
-  </dl>
-</div>
-<div class="option" id="option-providers.services.users._name_.units._name_.restartIfChanged">
-  <h3 class="option-name">
-    <a href="#option-providers.services.users._name_.units._name_.restartIfChanged" class="option-anchor">providers.services.users.&lt;name&gt;.units.&lt;name&gt;.restartIfChanged</a>
-    <button type="button" class="copy-link" aria-label="Copy link to this option" title="Copy link to this option"></button>
-    <span class="copy-feedback">Link copied!</span>
-  </h3>
-  <div class="option-description"><html><head></head><body><p>Whether a switch may stop and start this unit when its definition has changed.</p>
-<p>True for almost everything: a changed unit is one whose new definition is not
-what is running, and the point of a switch is to make the machine match the
-generation. Set false where applying the change costs more than leaving it
-pending, and the new definition then takes effect the next time the unit
-starts for any other reason.</p>
-<p>What that is for is a unit whose restart destroys something the user did not
-ask to lose. A display manager is the case: restarting it ends every session
-on the machine, so a switch which touched it would log the user out - and if
-the switch is being run <em>from</em> one of those sessions, it takes the rest of the
-switch with it. That is not hypothetical; it is how a generation comes to be
-activated and never recorded, because the tool driving it was killed between
-the two halves.</p>
-<p>Unrelated to being added or removed. A unit that is genuinely new is still
-started and one that is gone is still stopped - this says only that <em>changing</em>
-it is not reason enough to interrupt it.</p>
-</body></html></div>
-  <dl class="option-details">
-    <dt>Type</dt><dd class="option-value"><code>boolean</code></dd>
-    <dt>Default</dt><dd class="option-value"><html><head></head><body><html><head></head><body><pre class="highlight"><code class="language-nix"><span style="color:rgb(209,154,102);">true</span></code></pre></body></html>
-</body></html></dd>
-  </dl>
-  <dl class="option-details option-sources">
-    <dt>Declared in</dt><dd class="option-value"><code><a href="https://github.com/finix-community/finix/blob/main/modules/providers/services" target="_blank" rel="noopener noreferrer">&lt;finix/modules/providers/services&gt;</a></code></dd>
-  </dl>
-</div>
-<div class="option" id="option-providers.services.users._name_.units._name_.startTimeout">
-  <h3 class="option-name">
-    <a href="#option-providers.services.users._name_.units._name_.startTimeout" class="option-anchor">providers.services.users.&lt;name&gt;.units.&lt;name&gt;.startTimeout</a>
-    <button type="button" class="copy-link" aria-label="Copy link to this option" title="Copy link to this option"></button>
-    <span class="copy-feedback">Link copied!</span>
-  </h3>
-  <div class="option-description"><html><head></head><body><p>How long, in seconds, this unit may take to become ready before it is
-considered failed. Subject to
-<a class="option-reference" href="options.html#option-providers.services.supportedFeatures.startTimeout"><code class="nixos-option">providers.services.supportedFeatures.startTimeout</code></a>.</p>
-</body></html></div>
-  <dl class="option-details">
-    <dt>Type</dt><dd class="option-value"><code>null or (unsigned integer, meaning &gt;=0)</code></dd>
-    <dt>Default</dt><dd class="option-value"><html><head></head><body><html><head></head><body><pre class="highlight"><code class="language-nix"><span style="color:rgb(209,154,102);">null</span></code></pre></body></html>
-</body></html></dd>
-  </dl>
-  <dl class="option-details option-sources">
-    <dt>Declared in</dt><dd class="option-value"><code><a href="https://github.com/finix-community/finix/blob/main/modules/providers/services" target="_blank" rel="noopener noreferrer">&lt;finix/modules/providers/services&gt;</a></code></dd>
-  </dl>
-</div>
-<div class="option" id="option-providers.services.users._name_.units._name_.stopTimeout">
-  <h3 class="option-name">
-    <a href="#option-providers.services.users._name_.units._name_.stopTimeout" class="option-anchor">providers.services.users.&lt;name&gt;.units.&lt;name&gt;.stopTimeout</a>
-    <button type="button" class="copy-link" aria-label="Copy link to this option" title="Copy link to this option"></button>
-    <span class="copy-feedback">Link copied!</span>
-  </h3>
-  <div class="option-description"><html><head></head><body><p>How long, in seconds, this unit is given to exit after being asked to stop,
-before it is killed outright. Subject to
-<a class="option-reference" href="options.html#option-providers.services.supportedFeatures.stopTimeout"><code class="nixos-option">providers.services.supportedFeatures.stopTimeout</code></a>.</p>
-<p>Implementation defaults are chosen for units which exit promptly and are
-usually only a few seconds. Anything which flushes state on the way out - a
-database especially - should say so here rather than be killed mid-write.</p>
-</body></html></div>
-  <dl class="option-details">
-    <dt>Type</dt><dd class="option-value"><code>null or (unsigned integer, meaning &gt;=0)</code></dd>
-    <dt>Default</dt><dd class="option-value"><html><head></head><body><html><head></head><body><pre class="highlight"><code class="language-nix"><span style="color:rgb(209,154,102);">null</span></code></pre></body></html>
-</body></html></dd>
-  </dl>
-  <dl class="option-details option-sources">
-    <dt>Declared in</dt><dd class="option-value"><code><a href="https://github.com/finix-community/finix/blob/main/modules/providers/services" target="_blank" rel="noopener noreferrer">&lt;finix/modules/providers/services&gt;</a></code></dd>
-  </dl>
-</div>
-<div class="option" id="option-providers.services.users._name_.units._name_.terminal">
-  <h3 class="option-name">
-    <a href="#option-providers.services.users._name_.units._name_.terminal" class="option-anchor">providers.services.users.&lt;name&gt;.units.&lt;name&gt;.terminal</a>
-    <button type="button" class="copy-link" aria-label="Copy link to this option" title="Copy link to this option"></button>
-    <span class="copy-feedback">Link copied!</span>
-  </h3>
-  <div class="option-description"><html><head></head><body><p>Whether this unit's command opens a terminal itself and makes it its standard
-input, output and error - a getty, or a greeter run through one. An
-implementation must then leave the unit's output alone rather than capture it.</p>
-<p>Capturing is not merely pointless for such a program, it is harmful. finit's
-<code>log</code> forks a logger as a child of the unit's own process; the getty points its
-output at the terminal, the logger exits, and the unit is left holding a child
-it never made. <code>login</code> is then exec'd into that process, forks the shell, and
-waits for <em>any</em> child - reaping the logger instead, concluding the session is
-over, and exiting, at which point the kernel hangs up the shell before it has
-run a line. Every login on the machine returns straight to the prompt with
-nothing printed. tests/getty-login.nix pins it.</p>
-</body></html></div>
-  <dl class="option-details">
-    <dt>Type</dt><dd class="option-value"><code>boolean</code></dd>
-    <dt>Default</dt><dd class="option-value"><html><head></head><body><html><head></head><body><pre class="highlight"><code class="language-nix"><span style="color:rgb(209,154,102);">false</span></code></pre></body></html>
+    <dt>Default</dt><dd class="option-value"><html><head></head><body><html><head></head><body><pre class="highlight"><code class="language-nix"><span style="color:rgb(132,139,152);">[</span>&nbsp;<span style="color:rgb(132,139,152);">]</span></code></pre></body></html>
 </body></html></dd>
   </dl>
   <dl class="option-details option-sources">
@@ -352,18 +69,15 @@ nothing printed. tests/getty-login.nix pins it.</p>
   </h3>
   <div class="option-description"><html><head></head><body><p>What kind of unit this is, and whatever that kind needs.</p>
 <p><code>service</code> is a long-running process. <code>oneshot</code> is a command which runs to
-completion and is ready once it has exited successfully. <code>anchor</code> has no
-process at all and is ready once its own requirements are.</p>
-<p>Anchors exist to be named, so a unit can say "after the system is basically
-up" without naming the units that means. In practice they are the trunk, and
-ordinary modules have no reason to declare one - an interchangeable
-implementation should be selected by a <code>providers.</code> contract and define the
-shared unit name directly, rather than hiding behind an anchor.</p>
-<p>A kind carrying nothing may be written as a bare string, so <code>type = "anchor"</code>
-and <code>type = { anchor = { }; }</code> mean the same thing.</p>
+completion and is ready once it has exited successfully. <code>shutdown</code> is a
+command run once on the way down, after everything else has stopped.</p>
+<p>There is no kind for a unit with no process. A unit which wants to say "after
+the system logger" or "after devices have settled" names the unit which does
+that - and where several implementations can provide one thing, they define
+the same unit name, so whichever is enabled is what gets named.</p>
 </body></html></div>
   <dl class="option-details">
-    <dt>Type</dt><dd class="option-value"><code>attribute-tagged union with choices: anchor, oneshot, service or string convertible to it</code></dd>
+    <dt>Type</dt><dd class="option-value"><code>attribute-tagged union with choices: oneshot, service, shutdown or string convertible to it</code></dd>
     <dt>Default</dt><dd class="option-value"><html><head></head><body><html><head></head><body><pre class="highlight"><code class="language-nix"><span style="color:rgb(132,139,152);">{</span>&nbsp;<span style="color:rgb(86,182,194);">service</span>&nbsp;<span style="color:rgb(171,178,191);">=</span>&nbsp;<span style="color:rgb(132,139,152);">{</span>&nbsp;<span style="color:rgb(132,139,152);">}</span><span style="color:rgb(132,139,152);">;</span>&nbsp;<span style="color:rgb(132,139,152);">}</span></code></pre></body></html>
 </body></html></dd>
     <dt>Example</dt><dd class="option-value"><html><head></head><body><html><head></head><body><pre class="highlight"><code class="language-nix"><span style="color:rgb(132,139,152);">{</span>&nbsp;<span style="color:rgb(86,182,194);">service</span><span style="color:rgb(132,139,152);">.</span><span style="color:rgb(86,182,194);">readiness</span><span style="color:rgb(132,139,152);">.</span><span style="color:rgb(86,182,194);">pidfile</span><span style="color:rgb(132,139,152);">.</span><span style="color:rgb(86,182,194);">file</span>&nbsp;<span style="color:rgb(171,178,191);">=</span>&nbsp;<span style="color:rgb(152,195,121);">"</span><span style="color:rgb(152,195,121);">/run/x.pid</span><span style="color:rgb(152,195,121);">"</span><span style="color:rgb(132,139,152);">;</span>&nbsp;<span style="color:rgb(132,139,152);">}</span></code></pre></body></html>
@@ -373,28 +87,18 @@ and <code>type = { anchor = { }; }</code> mean the same thing.</p>
     <dt>Declared in</dt><dd class="option-value"><code><a href="https://github.com/finix-community/finix/blob/main/modules/providers/services" target="_blank" rel="noopener noreferrer">&lt;finix/modules/providers/services&gt;</a></code></dd>
   </dl>
 </div>
-<div class="option" id="option-providers.services.users._name_.units._name_.type.anchor">
-  <h3 class="option-name">
-    <a href="#option-providers.services.users._name_.units._name_.type.anchor" class="option-anchor">providers.services.users.&lt;name&gt;.units.&lt;name&gt;.type.anchor</a>
-    <button type="button" class="copy-link" aria-label="Copy link to this option" title="Copy link to this option"></button>
-    <span class="copy-feedback">Link copied!</span>
-  </h3>
-  <div class="option-description"><html><head></head><body><p>A unit with no process at all.</p>
-</body></html></div>
-  <dl class="option-details">
-    <dt>Type</dt><dd class="option-value"><code>submodule</code></dd>
-  </dl>
-  <dl class="option-details option-sources">
-    <dt>Declared in</dt><dd class="option-value"><code><a href="https://github.com/finix-community/finix/blob/main/modules/providers/services/default.nix" target="_blank" rel="noopener noreferrer">&lt;finix/modules/providers/services/default.nix&gt;</a></code></dd>
-  </dl>
-</div>
 <div class="option" id="option-providers.services.users._name_.units._name_.type.oneshot">
   <h3 class="option-name">
     <a href="#option-providers.services.users._name_.units._name_.type.oneshot" class="option-anchor">providers.services.users.&lt;name&gt;.units.&lt;name&gt;.type.oneshot</a>
     <button type="button" class="copy-link" aria-label="Copy link to this option" title="Copy link to this option"></button>
     <span class="copy-feedback">Link copied!</span>
   </h3>
-  <div class="option-description"><html><head></head><body><p>A command which runs to completion.</p>
+  <div class="option-description"><html><head></head><body><p>A command which runs to completion, and is ready once it has exited
+successfully.</p>
+<p>A oneshot has no readiness of its own beyond that. To hold dependants
+until something appears - a device node, say - make waiting for it the
+command: <code class="nixos-option">providers.services.lib.waitFor</code> gives the same waits
+a service's <code>readiness.waitFor</code> uses, as commands.</p>
 </body></html></div>
   <dl class="option-details">
     <dt>Type</dt><dd class="option-value"><code>submodule</code></dd>
@@ -410,233 +114,129 @@ and <code>type = { anchor = { }; }</code> mean the same thing.</p>
     <span class="copy-feedback">Link copied!</span>
   </h3>
   <div class="option-description"><html><head></head><body><p>The command this unit runs.</p>
-<p>May be left out when <code class="nixos-option">readiness</code> is set, for a unit
-whose only job is to wait for something - a device node
-appearing, say - so that whatever requires it waits too.</p>
-</body></html></div>
-  <dl class="option-details">
-    <dt>Type</dt><dd class="option-value"><code>null or main program, path or command</code></dd>
-    <dt>Default</dt><dd class="option-value"><html><head></head><body><html><head></head><body><pre class="highlight"><code class="language-nix"><span style="color:rgb(209,154,102);">null</span></code></pre></body></html>
-</body></html></dd>
-  </dl>
-  <dl class="option-details option-sources">
-    <dt>Declared in</dt><dd class="option-value"><code><a href="https://github.com/finix-community/finix/blob/main/modules/providers/services" target="_blank" rel="noopener noreferrer">&lt;finix/modules/providers/services&gt;</a></code></dd>
-  </dl>
-</div>
-<div class="option" id="option-providers.services.users._name_.units._name_.type.oneshot.readiness">
-  <h3 class="option-name">
-    <a href="#option-providers.services.users._name_.units._name_.type.oneshot.readiness" class="option-anchor">providers.services.users.&lt;name&gt;.units.&lt;name&gt;.type.oneshot.readiness</a>
-    <button type="button" class="copy-link" aria-label="Copy link to this option" title="Copy link to this option"></button>
-    <span class="copy-feedback">Link copied!</span>
-  </h3>
-  <div class="option-description"><html><head></head><body><p>Something which must be live, after the command has exited,
-before this unit counts as done.</p>
-<p>Without it a oneshot is ready the moment its command exits
-successfully. With it, it is ready once the command has exited
-and the thing named here has appeared, and units requiring it
-wait for both. Every <code>waitFor</code> kind is accepted, and works on
-every implementation: the wait is run as part of the unit's own
-command, so nothing has to observe it.</p>
-<p>Only <code>waitFor</code>: <code>fork</code>, <code>notify</code> and <code>s6</code> describe a process
-which stays running, and a oneshot is one which does not.</p>
-</body></html></div>
-  <dl class="option-details">
-    <dt>Type</dt><dd class="option-value"><code>null or attribute-tagged union with choices: waitFor</code></dd>
-    <dt>Default</dt><dd class="option-value"><html><head></head><body><html><head></head><body><pre class="highlight"><code class="language-nix"><span style="color:rgb(209,154,102);">null</span></code></pre></body></html>
-</body></html></dd>
-    <dt>Example</dt><dd class="option-value"><html><head></head><body><html><head></head><body><pre class="highlight"><code class="language-nix"><span style="color:rgb(132,139,152);">{</span>&nbsp;<span style="color:rgb(86,182,194);">waitFor</span><span style="color:rgb(132,139,152);">.</span><span style="color:rgb(86,182,194);">path</span><span style="color:rgb(132,139,152);">.</span><span style="color:rgb(86,182,194);">path</span>&nbsp;<span style="color:rgb(171,178,191);">=</span>&nbsp;<span style="color:rgb(152,195,121);">"</span><span style="color:rgb(152,195,121);">/dev/ttyUSB0</span><span style="color:rgb(152,195,121);">"</span><span style="color:rgb(132,139,152);">;</span>&nbsp;<span style="color:rgb(132,139,152);">}</span></code></pre></body></html>
-</body></html></dd>
-  </dl>
-  <dl class="option-details option-sources">
-    <dt>Declared in</dt><dd class="option-value"><code><a href="https://github.com/finix-community/finix/blob/main/modules/providers/services" target="_blank" rel="noopener noreferrer">&lt;finix/modules/providers/services&gt;</a></code></dd>
-  </dl>
-</div>
-<div class="option" id="option-providers.services.users._name_.units._name_.type.oneshot.readiness.waitFor">
-  <h3 class="option-name">
-    <a href="#option-providers.services.users._name_.units._name_.type.oneshot.readiness.waitFor" class="option-anchor">providers.services.users.&lt;name&gt;.units.&lt;name&gt;.type.oneshot.readiness.waitFor</a>
-    <button type="button" class="copy-link" aria-label="Copy link to this option" title="Copy link to this option"></button>
-    <span class="copy-feedback">Link copied!</span>
-  </h3>
-  <div class="option-description"><html><head></head><body><p>Ready once something appears and is live, for a daemon with no
-readiness protocol of its own - which is most of them.</p>
-<p>The tag says what is being waited for, and so what counts as
-live. An implementation reaches for a native mechanism where it
-has one for that kind, and polls otherwise. This is inference
-rather than assertion, which is why it is not <code>notify</code> or <code>s6</code>.</p>
-</body></html></div>
-  <dl class="option-details">
-    <dt>Type</dt><dd class="option-value"><code>attribute-tagged union with choices: check, path, pidfile, socket</code></dd>
-  </dl>
-  <dl class="option-details option-sources">
-    <dt>Declared in</dt><dd class="option-value"><code><a href="https://github.com/finix-community/finix/blob/main/modules/providers/services/default.nix" target="_blank" rel="noopener noreferrer">&lt;finix/modules/providers/services/default.nix&gt;</a></code></dd>
-  </dl>
-</div>
-<div class="option" id="option-providers.services.users._name_.units._name_.type.oneshot.readiness.waitFor.check">
-  <h3 class="option-name">
-    <a href="#option-providers.services.users._name_.units._name_.type.oneshot.readiness.waitFor.check" class="option-anchor">providers.services.users.&lt;name&gt;.units.&lt;name&gt;.type.oneshot.readiness.waitFor.check</a>
-    <button type="button" class="copy-link" aria-label="Copy link to this option" title="Copy link to this option"></button>
-    <span class="copy-feedback">Link copied!</span>
-  </h3>
-  <div class="option-description"><html><head></head><body><p>Ready once this command exits successfully.</p>
-<p>The command does the waiting - it is run once, and returning
-is what says the unit is up - so anything whose readiness only
-it can answer belongs here: a database accepting queries, an
-endpoint returning 200. The other kinds are the common cases
-of this one, written out so they need no script.</p>
-<p>A command which never returns stalls everything behind the
-unit until <code class="nixos-option">startTimeout</code>, where the implementation
-can bound it. It is the script's business to give up.</p>
-</body></html></div>
-  <dl class="option-details">
-    <dt>Type</dt><dd class="option-value"><code>submodule</code></dd>
-  </dl>
-  <dl class="option-details option-sources">
-    <dt>Declared in</dt><dd class="option-value"><code><a href="https://github.com/finix-community/finix/blob/main/modules/providers/services/default.nix" target="_blank" rel="noopener noreferrer">&lt;finix/modules/providers/services/default.nix&gt;</a></code></dd>
-  </dl>
-</div>
-<div class="option" id="option-providers.services.users._name_.units._name_.type.oneshot.readiness.waitFor.check.command">
-  <h3 class="option-name">
-    <a href="#option-providers.services.users._name_.units._name_.type.oneshot.readiness.waitFor.check.command" class="option-anchor">providers.services.users.&lt;name&gt;.units.&lt;name&gt;.type.oneshot.readiness.waitFor.check.command</a>
-    <button type="button" class="copy-link" aria-label="Copy link to this option" title="Copy link to this option"></button>
-    <span class="copy-feedback">Link copied!</span>
-  </h3>
-  <div class="option-description"><html><head></head><body><p>The command whose successful exit means ready.</p>
 </body></html></div>
   <dl class="option-details">
     <dt>Type</dt><dd class="option-value"><code>main program, path or command</code></dd>
-    <dt>Example</dt><dd class="option-value"><html><head></head><body><html><head></head><body><pre class="highlight"><code class="language-nix"><span style="color:rgb(171,178,191);">pkgs</span><span style="color:rgb(132,139,152);">.</span><span style="color:rgb(97,175,239);">writeShellScript</span>&nbsp;<span style="color:rgb(152,195,121);">"</span><span style="color:rgb(152,195,121);">pg-ready</span><span style="color:rgb(152,195,121);">"</span>&nbsp;<span style="color:rgb(152,195,121);">''</span><span style="color:rgb(152,195,121);"></span><br><span style="color:rgb(152,195,121);">&nbsp;&nbsp;</span><span style="color:rgb(198,120,221);">until</span><span style="color:rgb(152,195,121);">&nbsp;</span><span style="color:rgb(97,175,239);">pg_isready</span><span style="color:rgb(152,195,121);">&nbsp;</span><span style="color:rgb(232,102,113);">-q</span><span style="color:rgb(132,139,152);">;</span><span style="color:rgb(152,195,121);">&nbsp;</span><span style="color:rgb(198,120,221);">do</span><span style="color:rgb(152,195,121);">&nbsp;</span><span style="color:rgb(97,175,239);">sleep</span><span style="color:rgb(152,195,121);">&nbsp;</span><span style="color:rgb(232,102,113);">0.1</span><span style="color:rgb(132,139,152);">;</span><span style="color:rgb(152,195,121);">&nbsp;</span><span style="color:rgb(198,120,221);">done</span><span style="color:rgb(152,195,121);"></span><br><span style="color:rgb(152,195,121);">''</span><br></code></pre></body></html>
+  </dl>
+  <dl class="option-details option-sources">
+    <dt>Declared in</dt><dd class="option-value"><code><a href="https://github.com/finix-community/finix/blob/main/modules/providers/services" target="_blank" rel="noopener noreferrer">&lt;finix/modules/providers/services&gt;</a></code></dd>
+  </dl>
+</div>
+<div class="option" id="option-providers.services.users._name_.units._name_.type.oneshot.reloadTriggers">
+  <h3 class="option-name">
+    <a href="#option-providers.services.users._name_.units._name_.type.oneshot.reloadTriggers" class="option-anchor">providers.services.users.&lt;name&gt;.units.&lt;name&gt;.type.oneshot.reloadTriggers</a>
+    <button type="button" class="copy-link" aria-label="Copy link to this option" title="Copy link to this option"></button>
+    <span class="copy-feedback">Link copied!</span>
+  </h3>
+  <div class="option-description"><html><head></head><body><p>Files this unit's process reads which are not named anywhere else in the
+unit, listed so that changing one counts as changing the unit.</p>
+<p>A unit's identity is what <code class="nixos-option">providers.services.switch</code> compares
+across a rebuild: the command, the user, the environment, and the rest of
+what is written here. A daemon which reads a configuration file from a
+fixed path - <code>/etc/elogind/logind.conf</code>, say - names it nowhere, so the
+file can change while every one of those stays identical, and the daemon
+keeps running with the configuration it started with. Nothing reports it.</p>
+<p>Naming the file here makes it part of the unit, so the switch acts on it.
+What it does is reload where it can: a changed unit which declares
+<code class="nixos-option">type.service.reload</code> is asked to re-read its own configuration
+and keeps its pid, and only one which cannot is stopped and started.
+Hence the name - a restart is the fallback, not the intent. Whether
+reloading is enough is the unit's claim to make, which is why it is made
+there.</p>
+<p>Only for what the unit does not otherwise mention. A path which already
+appears in the command - as an argument, or in a generated script - is
+part of the unit by being there, and needs no second statement.</p>
+</body></html></div>
+  <dl class="option-details">
+    <dt>Type</dt><dd class="option-value"><code>list of (absolute path or string)</code></dd>
+    <dt>Default</dt><dd class="option-value"><html><head></head><body><html><head></head><body><pre class="highlight"><code class="language-nix"><span style="color:rgb(132,139,152);">[</span>&nbsp;<span style="color:rgb(132,139,152);">]</span></code></pre></body></html>
+</body></html></dd>
+    <dt>Example</dt><dd class="option-value"><html><head></head><body><html><head></head><body><pre class="highlight"><code class="language-nix"><span style="color:rgb(132,139,152);">[</span>&nbsp;<span style="color:rgb(171,178,191);">config</span><span style="color:rgb(132,139,152);">.</span><span style="color:rgb(86,182,194);">services</span><span style="color:rgb(132,139,152);">.</span><span style="color:rgb(86,182,194);">foo</span><span style="color:rgb(132,139,152);">.</span><span style="color:rgb(86,182,194);">configFile</span>&nbsp;<span style="color:rgb(132,139,152);">]</span></code></pre></body></html>
 </body></html></dd>
   </dl>
   <dl class="option-details option-sources">
     <dt>Declared in</dt><dd class="option-value"><code><a href="https://github.com/finix-community/finix/blob/main/modules/providers/services" target="_blank" rel="noopener noreferrer">&lt;finix/modules/providers/services&gt;</a></code></dd>
   </dl>
 </div>
-<div class="option" id="option-providers.services.users._name_.units._name_.type.oneshot.readiness.waitFor.path">
+<div class="option" id="option-providers.services.users._name_.units._name_.type.oneshot.restartIfChanged">
   <h3 class="option-name">
-    <a href="#option-providers.services.users._name_.units._name_.type.oneshot.readiness.waitFor.path" class="option-anchor">providers.services.users.&lt;name&gt;.units.&lt;name&gt;.type.oneshot.readiness.waitFor.path</a>
+    <a href="#option-providers.services.users._name_.units._name_.type.oneshot.restartIfChanged" class="option-anchor">providers.services.users.&lt;name&gt;.units.&lt;name&gt;.type.oneshot.restartIfChanged</a>
     <button type="button" class="copy-link" aria-label="Copy link to this option" title="Copy link to this option"></button>
     <span class="copy-feedback">Link copied!</span>
   </h3>
-  <div class="option-description"><html><head></head><body><p>Ready once the path exists, which is all that can be known
-about an arbitrary file.</p>
+  <div class="option-description"><html><head></head><body><p>Whether a switch may stop and start this unit when its definition has
+changed.</p>
+<p>True for almost everything: a changed unit is one whose new definition is
+not what is running, and the point of a switch is to make the machine
+match the generation. Set false where applying the change costs more than
+leaving it pending, and the new definition then takes effect the next
+time the unit starts for any other reason.</p>
+<p>What that is for is a unit whose restart destroys something the user did
+not ask to lose. A display manager is the case: restarting it ends every
+session on the machine, so a switch which touched it would log the user
+out - and if the switch is being run <em>from</em> one of those sessions, it
+takes the rest of the switch with it. That is not hypothetical; it is how
+a generation comes to be activated and never recorded, because the tool
+driving it was killed between the two halves.</p>
+<p>Unrelated to being added or removed. A unit that is genuinely new is
+still started and one that is gone is still stopped - this says only that
+<em>changing</em> it is not reason enough to interrupt it.</p>
 </body></html></div>
   <dl class="option-details">
-    <dt>Type</dt><dd class="option-value"><code>submodule</code></dd>
-  </dl>
-  <dl class="option-details option-sources">
-    <dt>Declared in</dt><dd class="option-value"><code><a href="https://github.com/finix-community/finix/blob/main/modules/providers/services/default.nix" target="_blank" rel="noopener noreferrer">&lt;finix/modules/providers/services/default.nix&gt;</a></code></dd>
-  </dl>
-</div>
-<div class="option" id="option-providers.services.users._name_.units._name_.type.oneshot.readiness.waitFor.path.path">
-  <h3 class="option-name">
-    <a href="#option-providers.services.users._name_.units._name_.type.oneshot.readiness.waitFor.path.path" class="option-anchor">providers.services.users.&lt;name&gt;.units.&lt;name&gt;.type.oneshot.readiness.waitFor.path.path</a>
-    <button type="button" class="copy-link" aria-label="Copy link to this option" title="Copy link to this option"></button>
-    <span class="copy-feedback">Link copied!</span>
-  </h3>
-  <div class="option-description"><html><head></head><body><p>The path to wait for.</p>
-</body></html></div>
-  <dl class="option-details">
-    <dt>Type</dt><dd class="option-value"><code>string</code></dd>
-    <dt>Example</dt><dd class="option-value"><html><head></head><body><html><head></head><body><pre class="highlight"><code class="language-nix"><span style="color:rgb(152,195,121);">"</span><span style="color:rgb(152,195,121);">/run/something.ready</span><span style="color:rgb(152,195,121);">"</span></code></pre></body></html>
+    <dt>Type</dt><dd class="option-value"><code>boolean</code></dd>
+    <dt>Default</dt><dd class="option-value"><html><head></head><body><html><head></head><body><pre class="highlight"><code class="language-nix"><span style="color:rgb(209,154,102);">true</span></code></pre></body></html>
 </body></html></dd>
   </dl>
   <dl class="option-details option-sources">
     <dt>Declared in</dt><dd class="option-value"><code><a href="https://github.com/finix-community/finix/blob/main/modules/providers/services" target="_blank" rel="noopener noreferrer">&lt;finix/modules/providers/services&gt;</a></code></dd>
   </dl>
 </div>
-<div class="option" id="option-providers.services.users._name_.units._name_.type.oneshot.readiness.waitFor.pidfile">
+<div class="option" id="option-providers.services.users._name_.units._name_.type.oneshot.startTimeout">
   <h3 class="option-name">
-    <a href="#option-providers.services.users._name_.units._name_.type.oneshot.readiness.waitFor.pidfile" class="option-anchor">providers.services.users.&lt;name&gt;.units.&lt;name&gt;.type.oneshot.readiness.waitFor.pidfile</a>
+    <a href="#option-providers.services.users._name_.units._name_.type.oneshot.startTimeout" class="option-anchor">providers.services.users.&lt;name&gt;.units.&lt;name&gt;.type.oneshot.startTimeout</a>
     <button type="button" class="copy-link" aria-label="Copy link to this option" title="Copy link to this option"></button>
     <span class="copy-feedback">Link copied!</span>
   </h3>
-  <div class="option-description"><html><head></head><body><p>Ready once the file exists and the process it names is alive.</p>
-<p>This also says the daemon forks into the background to write
-it, which finit and dinit observe directly. A program which
-stays in the foreground and happens to write a pid file is
-not this - it is <code>path</code> - and an implementation waiting for a
-fork which never comes will fail the unit on its start
-timeout.</p>
+  <div class="option-description"><html><head></head><body><p>How long, in seconds, this unit may take to become ready before it is
+considered failed. <code>null</code> is no bound at all, on every implementation -
+including the ones with a default of their own, which is overridden.</p>
+<p>For a service, subject to
+<a class="option-reference" href="options.html#option-providers.services.supportedFeatures.startTimeout"><code class="nixos-option">providers.services.supportedFeatures.startTimeout</code></a>. For a
+oneshot it is enforced by the unit itself - its command is run under
+<code>timeout</code> - so it holds on every implementation.</p>
 </body></html></div>
   <dl class="option-details">
-    <dt>Type</dt><dd class="option-value"><code>submodule</code></dd>
-  </dl>
-  <dl class="option-details option-sources">
-    <dt>Declared in</dt><dd class="option-value"><code><a href="https://github.com/finix-community/finix/blob/main/modules/providers/services/default.nix" target="_blank" rel="noopener noreferrer">&lt;finix/modules/providers/services/default.nix&gt;</a></code></dd>
-  </dl>
-</div>
-<div class="option" id="option-providers.services.users._name_.units._name_.type.oneshot.readiness.waitFor.pidfile.file">
-  <h3 class="option-name">
-    <a href="#option-providers.services.users._name_.units._name_.type.oneshot.readiness.waitFor.pidfile.file" class="option-anchor">providers.services.users.&lt;name&gt;.units.&lt;name&gt;.type.oneshot.readiness.waitFor.pidfile.file</a>
-    <button type="button" class="copy-link" aria-label="Copy link to this option" title="Copy link to this option"></button>
-    <span class="copy-feedback">Link copied!</span>
-  </h3>
-  <div class="option-description"><html><head></head><body><p>The file the daemon writes its process ID to.</p>
-</body></html></div>
-  <dl class="option-details">
-    <dt>Type</dt><dd class="option-value"><code>string</code></dd>
-    <dt>Example</dt><dd class="option-value"><html><head></head><body><html><head></head><body><pre class="highlight"><code class="language-nix"><span style="color:rgb(152,195,121);">"</span><span style="color:rgb(152,195,121);">/run/nginx.pid</span><span style="color:rgb(152,195,121);">"</span></code></pre></body></html>
-</body></html></dd>
-  </dl>
-  <dl class="option-details option-sources">
-    <dt>Declared in</dt><dd class="option-value"><code><a href="https://github.com/finix-community/finix/blob/main/modules/providers/services" target="_blank" rel="noopener noreferrer">&lt;finix/modules/providers/services&gt;</a></code></dd>
-  </dl>
-</div>
-<div class="option" id="option-providers.services.users._name_.units._name_.type.oneshot.readiness.waitFor.socket">
-  <h3 class="option-name">
-    <a href="#option-providers.services.users._name_.units._name_.type.oneshot.readiness.waitFor.socket" class="option-anchor">providers.services.users.&lt;name&gt;.units.&lt;name&gt;.type.oneshot.readiness.waitFor.socket</a>
-    <button type="button" class="copy-link" aria-label="Copy link to this option" title="Copy link to this option"></button>
-    <span class="copy-feedback">Link copied!</span>
-  </h3>
-  <div class="option-description"><html><head></head><body><p>Ready once connecting to the socket succeeds.</p>
-<p>Not merely that the path is there: a unix socket exists from
-<code>bind</code>, and <code>listen</code> comes afterwards, so a client arriving
-in that window is refused by a socket which demonstrably
-exists.</p>
-</body></html></div>
-  <dl class="option-details">
-    <dt>Type</dt><dd class="option-value"><code>submodule</code></dd>
-  </dl>
-  <dl class="option-details option-sources">
-    <dt>Declared in</dt><dd class="option-value"><code><a href="https://github.com/finix-community/finix/blob/main/modules/providers/services/default.nix" target="_blank" rel="noopener noreferrer">&lt;finix/modules/providers/services/default.nix&gt;</a></code></dd>
-  </dl>
-</div>
-<div class="option" id="option-providers.services.users._name_.units._name_.type.oneshot.readiness.waitFor.socket.path">
-  <h3 class="option-name">
-    <a href="#option-providers.services.users._name_.units._name_.type.oneshot.readiness.waitFor.socket.path" class="option-anchor">providers.services.users.&lt;name&gt;.units.&lt;name&gt;.type.oneshot.readiness.waitFor.socket.path</a>
-    <button type="button" class="copy-link" aria-label="Copy link to this option" title="Copy link to this option"></button>
-    <span class="copy-feedback">Link copied!</span>
-  </h3>
-  <div class="option-description"><html><head></head><body><p>The socket this unit binds.</p>
-</body></html></div>
-  <dl class="option-details">
-    <dt>Type</dt><dd class="option-value"><code>string</code></dd>
-    <dt>Example</dt><dd class="option-value"><html><head></head><body><html><head></head><body><pre class="highlight"><code class="language-nix"><span style="color:rgb(152,195,121);">"</span><span style="color:rgb(152,195,121);">/run/dbus/system_bus_socket</span><span style="color:rgb(152,195,121);">"</span></code></pre></body></html>
-</body></html></dd>
-  </dl>
-  <dl class="option-details option-sources">
-    <dt>Declared in</dt><dd class="option-value"><code><a href="https://github.com/finix-community/finix/blob/main/modules/providers/services" target="_blank" rel="noopener noreferrer">&lt;finix/modules/providers/services&gt;</a></code></dd>
-  </dl>
-</div>
-<div class="option" id="option-providers.services.users._name_.units._name_.type.oneshot.readinessTimeout">
-  <h3 class="option-name">
-    <a href="#option-providers.services.users._name_.units._name_.type.oneshot.readinessTimeout" class="option-anchor">providers.services.users.&lt;name&gt;.units.&lt;name&gt;.type.oneshot.readinessTimeout</a>
-    <button type="button" class="copy-link" aria-label="Copy link to this option" title="Copy link to this option"></button>
-    <span class="copy-feedback">Link copied!</span>
-  </h3>
-  <div class="option-description"><html><head></head><body><p>How long, in seconds, the wait in <code class="nixos-option">readiness</code> may take
-before the unit fails. Its dependants then never start, and
-the rest of the boot carries on without them.</p>
-<p><code>null</code> waits indefinitely - which, for something that may never
-appear, holds everything behind this unit for as long as the
-machine is up. Unlike <code class="nixos-option">startTimeout</code> this is enforced
-by the unit itself, so it works on every implementation.</p>
-</body></html></div>
-  <dl class="option-details">
-    <dt>Type</dt><dd class="option-value"><code>null or (positive integer, meaning &gt;0)</code></dd>
+    <dt>Type</dt><dd class="option-value"><code>null or (unsigned integer, meaning &gt;=0)</code></dd>
     <dt>Default</dt><dd class="option-value"><html><head></head><body><html><head></head><body><pre class="highlight"><code class="language-nix"><span style="color:rgb(209,154,102);">null</span></code></pre></body></html>
 </body></html></dd>
-    <dt>Example</dt><dd class="option-value"><html><head></head><body><html><head></head><body><pre class="highlight"><code class="language-nix"><span style="color:rgb(209,154,102);">10</span></code></pre></body></html>
+  </dl>
+  <dl class="option-details option-sources">
+    <dt>Declared in</dt><dd class="option-value"><code><a href="https://github.com/finix-community/finix/blob/main/modules/providers/services" target="_blank" rel="noopener noreferrer">&lt;finix/modules/providers/services&gt;</a></code></dd>
+  </dl>
+</div>
+<div class="option" id="option-providers.services.users._name_.units._name_.type.oneshot.terminal">
+  <h3 class="option-name">
+    <a href="#option-providers.services.users._name_.units._name_.type.oneshot.terminal" class="option-anchor">providers.services.users.&lt;name&gt;.units.&lt;name&gt;.type.oneshot.terminal</a>
+    <button type="button" class="copy-link" aria-label="Copy link to this option" title="Copy link to this option"></button>
+    <span class="copy-feedback">Link copied!</span>
+  </h3>
+  <div class="option-description"><html><head></head><body><p>Whether this unit's command opens a terminal itself and makes it its
+standard input, output and error - a getty, or a greeter run through one.
+An implementation must then leave the unit's output alone rather than
+capture it.</p>
+<p>Capturing is not merely pointless for such a program, it is harmful.
+finit's <code>log</code> forks a logger as a child of the unit's own process; the
+getty points its output at the terminal, the logger exits, and the unit is
+left holding a child it never made. <code>login</code> is then exec'd into that
+process, forks the shell, and waits for <em>any</em> child - reaping the logger
+instead, concluding the session is over, and exiting, at which point the
+kernel hangs up the shell before it has run a line. Every login on the
+machine returns straight to the prompt with nothing printed.
+tests/getty-login.nix pins it.</p>
+</body></html></div>
+  <dl class="option-details">
+    <dt>Type</dt><dd class="option-value"><code>boolean</code></dd>
+    <dt>Default</dt><dd class="option-value"><html><head></head><body><html><head></head><body><pre class="highlight"><code class="language-nix"><span style="color:rgb(209,154,102);">false</span></code></pre></body></html>
 </body></html></dd>
   </dl>
   <dl class="option-details option-sources">
@@ -735,6 +335,186 @@ and dinit and runit would be reduced to sending a bare signal anyway.</p>
     <dt>Declared in</dt><dd class="option-value"><code><a href="https://github.com/finix-community/finix/blob/main/modules/providers/services" target="_blank" rel="noopener noreferrer">&lt;finix/modules/providers/services&gt;</a></code></dd>
   </dl>
 </div>
+<div class="option" id="option-providers.services.users._name_.units._name_.type.service.reloadTriggers">
+  <h3 class="option-name">
+    <a href="#option-providers.services.users._name_.units._name_.type.service.reloadTriggers" class="option-anchor">providers.services.users.&lt;name&gt;.units.&lt;name&gt;.type.service.reloadTriggers</a>
+    <button type="button" class="copy-link" aria-label="Copy link to this option" title="Copy link to this option"></button>
+    <span class="copy-feedback">Link copied!</span>
+  </h3>
+  <div class="option-description"><html><head></head><body><p>Files this unit's process reads which are not named anywhere else in the
+unit, listed so that changing one counts as changing the unit.</p>
+<p>A unit's identity is what <code class="nixos-option">providers.services.switch</code> compares
+across a rebuild: the command, the user, the environment, and the rest of
+what is written here. A daemon which reads a configuration file from a
+fixed path - <code>/etc/elogind/logind.conf</code>, say - names it nowhere, so the
+file can change while every one of those stays identical, and the daemon
+keeps running with the configuration it started with. Nothing reports it.</p>
+<p>Naming the file here makes it part of the unit, so the switch acts on it.
+What it does is reload where it can: a changed unit which declares
+<code class="nixos-option">type.service.reload</code> is asked to re-read its own configuration
+and keeps its pid, and only one which cannot is stopped and started.
+Hence the name - a restart is the fallback, not the intent. Whether
+reloading is enough is the unit's claim to make, which is why it is made
+there.</p>
+<p>Only for what the unit does not otherwise mention. A path which already
+appears in the command - as an argument, or in a generated script - is
+part of the unit by being there, and needs no second statement.</p>
+</body></html></div>
+  <dl class="option-details">
+    <dt>Type</dt><dd class="option-value"><code>list of (absolute path or string)</code></dd>
+    <dt>Default</dt><dd class="option-value"><html><head></head><body><html><head></head><body><pre class="highlight"><code class="language-nix"><span style="color:rgb(132,139,152);">[</span>&nbsp;<span style="color:rgb(132,139,152);">]</span></code></pre></body></html>
+</body></html></dd>
+    <dt>Example</dt><dd class="option-value"><html><head></head><body><html><head></head><body><pre class="highlight"><code class="language-nix"><span style="color:rgb(132,139,152);">[</span>&nbsp;<span style="color:rgb(171,178,191);">config</span><span style="color:rgb(132,139,152);">.</span><span style="color:rgb(86,182,194);">services</span><span style="color:rgb(132,139,152);">.</span><span style="color:rgb(86,182,194);">foo</span><span style="color:rgb(132,139,152);">.</span><span style="color:rgb(86,182,194);">configFile</span>&nbsp;<span style="color:rgb(132,139,152);">]</span></code></pre></body></html>
+</body></html></dd>
+  </dl>
+  <dl class="option-details option-sources">
+    <dt>Declared in</dt><dd class="option-value"><code><a href="https://github.com/finix-community/finix/blob/main/modules/providers/services" target="_blank" rel="noopener noreferrer">&lt;finix/modules/providers/services&gt;</a></code></dd>
+  </dl>
+</div>
+<div class="option" id="option-providers.services.users._name_.units._name_.type.service.restartIfChanged">
+  <h3 class="option-name">
+    <a href="#option-providers.services.users._name_.units._name_.type.service.restartIfChanged" class="option-anchor">providers.services.users.&lt;name&gt;.units.&lt;name&gt;.type.service.restartIfChanged</a>
+    <button type="button" class="copy-link" aria-label="Copy link to this option" title="Copy link to this option"></button>
+    <span class="copy-feedback">Link copied!</span>
+  </h3>
+  <div class="option-description"><html><head></head><body><p>Whether a switch may stop and start this unit when its definition has
+changed.</p>
+<p>True for almost everything: a changed unit is one whose new definition is
+not what is running, and the point of a switch is to make the machine
+match the generation. Set false where applying the change costs more than
+leaving it pending, and the new definition then takes effect the next
+time the unit starts for any other reason.</p>
+<p>What that is for is a unit whose restart destroys something the user did
+not ask to lose. A display manager is the case: restarting it ends every
+session on the machine, so a switch which touched it would log the user
+out - and if the switch is being run <em>from</em> one of those sessions, it
+takes the rest of the switch with it. That is not hypothetical; it is how
+a generation comes to be activated and never recorded, because the tool
+driving it was killed between the two halves.</p>
+<p>Unrelated to being added or removed. A unit that is genuinely new is
+still started and one that is gone is still stopped - this says only that
+<em>changing</em> it is not reason enough to interrupt it.</p>
+</body></html></div>
+  <dl class="option-details">
+    <dt>Type</dt><dd class="option-value"><code>boolean</code></dd>
+    <dt>Default</dt><dd class="option-value"><html><head></head><body><html><head></head><body><pre class="highlight"><code class="language-nix"><span style="color:rgb(209,154,102);">true</span></code></pre></body></html>
+</body></html></dd>
+  </dl>
+  <dl class="option-details option-sources">
+    <dt>Declared in</dt><dd class="option-value"><code><a href="https://github.com/finix-community/finix/blob/main/modules/providers/services" target="_blank" rel="noopener noreferrer">&lt;finix/modules/providers/services&gt;</a></code></dd>
+  </dl>
+</div>
+<div class="option" id="option-providers.services.users._name_.units._name_.type.service.startTimeout">
+  <h3 class="option-name">
+    <a href="#option-providers.services.users._name_.units._name_.type.service.startTimeout" class="option-anchor">providers.services.users.&lt;name&gt;.units.&lt;name&gt;.type.service.startTimeout</a>
+    <button type="button" class="copy-link" aria-label="Copy link to this option" title="Copy link to this option"></button>
+    <span class="copy-feedback">Link copied!</span>
+  </h3>
+  <div class="option-description"><html><head></head><body><p>How long, in seconds, this unit may take to become ready before it is
+considered failed. <code>null</code> is no bound at all, on every implementation -
+including the ones with a default of their own, which is overridden.</p>
+<p>For a service, subject to
+<a class="option-reference" href="options.html#option-providers.services.supportedFeatures.startTimeout"><code class="nixos-option">providers.services.supportedFeatures.startTimeout</code></a>. For a
+oneshot it is enforced by the unit itself - its command is run under
+<code>timeout</code> - so it holds on every implementation.</p>
+</body></html></div>
+  <dl class="option-details">
+    <dt>Type</dt><dd class="option-value"><code>null or (unsigned integer, meaning &gt;=0)</code></dd>
+    <dt>Default</dt><dd class="option-value"><html><head></head><body><html><head></head><body><pre class="highlight"><code class="language-nix"><span style="color:rgb(209,154,102);">null</span></code></pre></body></html>
+</body></html></dd>
+  </dl>
+  <dl class="option-details option-sources">
+    <dt>Declared in</dt><dd class="option-value"><code><a href="https://github.com/finix-community/finix/blob/main/modules/providers/services" target="_blank" rel="noopener noreferrer">&lt;finix/modules/providers/services&gt;</a></code></dd>
+  </dl>
+</div>
+<div class="option" id="option-providers.services.users._name_.units._name_.type.service.stopTimeout">
+  <h3 class="option-name">
+    <a href="#option-providers.services.users._name_.units._name_.type.service.stopTimeout" class="option-anchor">providers.services.users.&lt;name&gt;.units.&lt;name&gt;.type.service.stopTimeout</a>
+    <button type="button" class="copy-link" aria-label="Copy link to this option" title="Copy link to this option"></button>
+    <span class="copy-feedback">Link copied!</span>
+  </h3>
+  <div class="option-description"><html><head></head><body><p>How long, in seconds, this unit is given to exit after being asked to
+stop, before it is killed outright. Subject to
+<a class="option-reference" href="options.html#option-providers.services.supportedFeatures.stopTimeout"><code class="nixos-option">providers.services.supportedFeatures.stopTimeout</code></a>.</p>
+<p>Implementation defaults are chosen for units which exit promptly and are
+usually only a few seconds. Anything which flushes state on the way out -
+a database especially - should say so here rather than be killed
+mid-write.</p>
+</body></html></div>
+  <dl class="option-details">
+    <dt>Type</dt><dd class="option-value"><code>null or (unsigned integer, meaning &gt;=0)</code></dd>
+    <dt>Default</dt><dd class="option-value"><html><head></head><body><html><head></head><body><pre class="highlight"><code class="language-nix"><span style="color:rgb(209,154,102);">null</span></code></pre></body></html>
+</body></html></dd>
+  </dl>
+  <dl class="option-details option-sources">
+    <dt>Declared in</dt><dd class="option-value"><code><a href="https://github.com/finix-community/finix/blob/main/modules/providers/services" target="_blank" rel="noopener noreferrer">&lt;finix/modules/providers/services&gt;</a></code></dd>
+  </dl>
+</div>
+<div class="option" id="option-providers.services.users._name_.units._name_.type.service.terminal">
+  <h3 class="option-name">
+    <a href="#option-providers.services.users._name_.units._name_.type.service.terminal" class="option-anchor">providers.services.users.&lt;name&gt;.units.&lt;name&gt;.type.service.terminal</a>
+    <button type="button" class="copy-link" aria-label="Copy link to this option" title="Copy link to this option"></button>
+    <span class="copy-feedback">Link copied!</span>
+  </h3>
+  <div class="option-description"><html><head></head><body><p>Whether this unit's command opens a terminal itself and makes it its
+standard input, output and error - a getty, or a greeter run through one.
+An implementation must then leave the unit's output alone rather than
+capture it.</p>
+<p>Capturing is not merely pointless for such a program, it is harmful.
+finit's <code>log</code> forks a logger as a child of the unit's own process; the
+getty points its output at the terminal, the logger exits, and the unit is
+left holding a child it never made. <code>login</code> is then exec'd into that
+process, forks the shell, and waits for <em>any</em> child - reaping the logger
+instead, concluding the session is over, and exiting, at which point the
+kernel hangs up the shell before it has run a line. Every login on the
+machine returns straight to the prompt with nothing printed.
+tests/getty-login.nix pins it.</p>
+</body></html></div>
+  <dl class="option-details">
+    <dt>Type</dt><dd class="option-value"><code>boolean</code></dd>
+    <dt>Default</dt><dd class="option-value"><html><head></head><body><html><head></head><body><pre class="highlight"><code class="language-nix"><span style="color:rgb(209,154,102);">false</span></code></pre></body></html>
+</body></html></dd>
+  </dl>
+  <dl class="option-details option-sources">
+    <dt>Declared in</dt><dd class="option-value"><code><a href="https://github.com/finix-community/finix/blob/main/modules/providers/services" target="_blank" rel="noopener noreferrer">&lt;finix/modules/providers/services&gt;</a></code></dd>
+  </dl>
+</div>
+<div class="option" id="option-providers.services.users._name_.units._name_.type.shutdown">
+  <h3 class="option-name">
+    <a href="#option-providers.services.users._name_.units._name_.type.shutdown" class="option-anchor">providers.services.users.&lt;name&gt;.units.&lt;name&gt;.type.shutdown</a>
+    <button type="button" class="copy-link" aria-label="Copy link to this option" title="Copy link to this option"></button>
+    <span class="copy-feedback">Link copied!</span>
+  </h3>
+  <div class="option-description"><html><head></head><body><p>A command run once, on the way down, after every other unit has
+stopped.</p>
+<p>Not a process anything supervises: the shutdown units are lowered into
+a single script, in the order their <code class="nixos-option">requires</code> give, and the
+implementation runs that script at the one point it reliably reaches
+on the way down. So <code>requires</code> here means "after these, in that
+script", and may name only other shutdown units.</p>
+</body></html></div>
+  <dl class="option-details">
+    <dt>Type</dt><dd class="option-value"><code>submodule</code></dd>
+  </dl>
+  <dl class="option-details option-sources">
+    <dt>Declared in</dt><dd class="option-value"><code><a href="https://github.com/finix-community/finix/blob/main/modules/providers/services/default.nix" target="_blank" rel="noopener noreferrer">&lt;finix/modules/providers/services/default.nix&gt;</a></code></dd>
+  </dl>
+</div>
+<div class="option" id="option-providers.services.users._name_.units._name_.type.shutdown.command">
+  <h3 class="option-name">
+    <a href="#option-providers.services.users._name_.units._name_.type.shutdown.command" class="option-anchor">providers.services.users.&lt;name&gt;.units.&lt;name&gt;.type.shutdown.command</a>
+    <button type="button" class="copy-link" aria-label="Copy link to this option" title="Copy link to this option"></button>
+    <span class="copy-feedback">Link copied!</span>
+  </h3>
+  <div class="option-description"><html><head></head><body><p>The command this unit runs.</p>
+</body></html></div>
+  <dl class="option-details">
+    <dt>Type</dt><dd class="option-value"><code>main program, path or command</code></dd>
+  </dl>
+  <dl class="option-details option-sources">
+    <dt>Declared in</dt><dd class="option-value"><code><a href="https://github.com/finix-community/finix/blob/main/modules/providers/services" target="_blank" rel="noopener noreferrer">&lt;finix/modules/providers/services&gt;</a></code></dd>
+  </dl>
+</div>
 <div class="option" id="option-providers.services.users._name_.units._name_.user">
   <h3 class="option-name">
     <a href="#option-providers.services.users._name_.units._name_.user" class="option-anchor">providers.services.users.&lt;name&gt;.units.&lt;name&gt;.user</a>
@@ -750,168 +530,6 @@ and dinit and runit would be reduced to sending a bare signal anyway.</p>
   </dl>
   <dl class="option-details option-sources">
     <dt>Declared in</dt><dd class="option-value"><code><a href="https://github.com/finix-community/finix/blob/main/modules/providers/services" target="_blank" rel="noopener noreferrer">&lt;finix/modules/providers/services&gt;</a></code></dd>
-  </dl>
-</div>
-<div class="option" id="option-providers.ttys.package">
-  <h3 class="option-name">
-    <a href="#option-providers.ttys.package" class="option-anchor">providers.ttys.package</a>
-    <button type="button" class="copy-link" aria-label="Copy link to this option" title="Copy link to this option"></button>
-    <span class="copy-feedback">Link copied!</span>
-  </h3>
-  <div class="option-description"><html><head></head><body><p>The program to run on a device claimed with no <code class="nixos-option">command</code> of its own.</p>
-<p><code>null</code> falls back to <code>agetty</code>.</p>
-</body></html></div>
-  <dl class="option-details">
-    <dt>Type</dt><dd class="option-value"><code>null or package</code></dd>
-    <dt>Default</dt><dd class="option-value"><html><head></head><body><html><head></head><body><pre class="highlight"><code class="language-nix"><span style="color:rgb(209,154,102);">null</span></code></pre></body></html>
-</body></html></dd>
-    <dt>Example</dt><dd class="option-value"><html><head></head><body><html><head></head><body><pre class="highlight"><code class="language-nix"><span style="color:rgb(171,178,191);">pkgs</span><span style="color:rgb(132,139,152);">.</span><span style="color:rgb(86,182,194);">util-linux</span>&nbsp;<span style="color:rgb(171,178,191);">//</span>&nbsp;<span style="color:rgb(132,139,152);">{</span><br>&nbsp;&nbsp;<span style="color:rgb(86,182,194);">meta</span><span style="color:rgb(132,139,152);">.</span><span style="color:rgb(86,182,194);">mainProgram</span>&nbsp;<span style="color:rgb(171,178,191);">=</span>&nbsp;<span style="color:rgb(152,195,121);">"</span><span style="color:rgb(152,195,121);">agetty</span><span style="color:rgb(152,195,121);">"</span><span style="color:rgb(132,139,152);">;</span><br><span style="color:rgb(132,139,152);">}</span><br></code></pre></body></html>
-</body></html></dd>
-  </dl>
-  <dl class="option-details option-sources">
-    <dt>Declared in</dt><dd class="option-value"><code><a href="https://github.com/finix-community/finix/blob/main/modules/providers/ttys" target="_blank" rel="noopener noreferrer">&lt;finix/modules/providers/ttys&gt;</a></code></dd>
-  </dl>
-</div>
-<div class="option" id="option-providers.ttys.args">
-  <h3 class="option-name">
-    <a href="#option-providers.ttys.args" class="option-anchor">providers.ttys.args</a>
-    <button type="button" class="copy-link" aria-label="Copy link to this option" title="Copy link to this option"></button>
-    <span class="copy-feedback">Link copied!</span>
-  </h3>
-  <div class="option-description"><html><head></head><body><p>How <code class="nixos-option">package</code> is invoked: a function from
-<code>{ device, login, autologin, extraArgs }</code> to its argument list, or the name of one
-provided here - <code>"agetty"</code> or <code>"busybox"</code>.</p>
-<p>The getty's command line is its own syntax, and the contract cannot know it. <code>autologin</code>
-is a user name or <code>null</code>; a getty which cannot log anyone in without a prompt should
-throw when it is set.</p>
-</body></html></div>
-  <dl class="option-details">
-    <dt>Type</dt><dd class="option-value"><code>(function that evaluates to a(n) list of string) or (one of "agetty", "busybox") convertible to it</code></dd>
-    <dt>Default</dt><dd class="option-value"><html><head></head><body><html><head></head><body><pre class="highlight"><code class="language-nix"><span style="color:rgb(152,195,121);">"</span><span style="color:rgb(152,195,121);">agetty</span><span style="color:rgb(152,195,121);">"</span></code></pre></body></html>
-</body></html></dd>
-    <dt>Example</dt><dd class="option-value"><html><head></head><body><html><head></head><body><pre class="highlight"><code class="language-nix"><span style="color:rgb(132,139,152);">{</span><br>&nbsp;&nbsp;<span style="color:rgb(86,182,194);">package</span>&nbsp;<span style="color:rgb(171,178,191);">=</span>&nbsp;<span style="color:rgb(171,178,191);">pkgs</span><span style="color:rgb(132,139,152);">.</span><span style="color:rgb(86,182,194);">busybox</span>&nbsp;<span style="color:rgb(171,178,191);">//</span>&nbsp;<span style="color:rgb(132,139,152);">{</span>&nbsp;<span style="color:rgb(86,182,194);">meta</span><span style="color:rgb(132,139,152);">.</span><span style="color:rgb(86,182,194);">mainProgram</span>&nbsp;<span style="color:rgb(171,178,191);">=</span>&nbsp;<span style="color:rgb(152,195,121);">"</span><span style="color:rgb(152,195,121);">getty</span><span style="color:rgb(152,195,121);">"</span><span style="color:rgb(132,139,152);">;</span>&nbsp;<span style="color:rgb(132,139,152);">}</span><span style="color:rgb(132,139,152);">;</span><br>&nbsp;&nbsp;<span style="color:rgb(86,182,194);">args</span>&nbsp;<span style="color:rgb(171,178,191);">=</span>&nbsp;<span style="color:rgb(152,195,121);">"</span><span style="color:rgb(152,195,121);">busybox</span><span style="color:rgb(152,195,121);">"</span><span style="color:rgb(132,139,152);">;</span><br><span style="color:rgb(132,139,152);">}</span><br></code></pre></body></html>
-</body></html></dd>
-  </dl>
-  <dl class="option-details option-sources">
-    <dt>Declared in</dt><dd class="option-value"><code><a href="https://github.com/finix-community/finix/blob/main/modules/providers/ttys" target="_blank" rel="noopener noreferrer">&lt;finix/modules/providers/ttys&gt;</a></code></dd>
-  </dl>
-</div>
-<div class="option" id="option-providers.ttys.devices">
-  <h3 class="option-name">
-    <a href="#option-providers.ttys.devices" class="option-anchor">providers.ttys.devices</a>
-    <button type="button" class="copy-link" aria-label="Copy link to this option" title="Copy link to this option"></button>
-    <span class="copy-feedback">Link copied!</span>
-  </h3>
-  <div class="option-description"><html><head></head><body><p>The terminals this machine runs something on, keyed by device.</p>
-<p>Defining a device claims it: whatever is defined here is the only thing which will be
-started on that terminal. A login prompt is declared at default priority, so a display
-manager or an autologin claims a device simply by defining its <code class="nixos-option">command</code>.</p>
-</body></html></div>
-  <dl class="option-details">
-    <dt>Type</dt><dd class="option-value"><code>attribute set of (submodule)</code></dd>
-    <dt>Default</dt><dd class="option-value"><html><head></head><body><html><head></head><body><pre class="highlight"><code class="language-nix"><span style="color:rgb(132,139,152);">{</span>&nbsp;<span style="color:rgb(132,139,152);">}</span></code></pre></body></html>
-</body></html></dd>
-    <dt>Example</dt><dd class="option-value"><html><head></head><body><html><head></head><body><pre class="highlight"><code class="language-nix"><span style="color:rgb(132,139,152);">{</span><br>&nbsp;&nbsp;<span style="color:rgb(86,182,194);">tty1</span><span style="color:rgb(132,139,152);">.</span><span style="color:rgb(86,182,194);">command</span>&nbsp;<span style="color:rgb(171,178,191);">=</span>&nbsp;<span style="color:rgb(152,195,121);">"</span><span style="color:rgb(232,102,113);">${</span><span style="color:rgb(171,178,191);">pkgs</span><span style="color:rgb(132,139,152);">.</span><span style="color:rgb(86,182,194);">util-linux</span><span style="color:rgb(232,102,113);">}</span><span style="color:rgb(152,195,121);">/bin/agetty&nbsp;-nil&nbsp;</span><span style="color:rgb(232,102,113);">${</span><span style="color:rgb(171,178,191);">lib</span><span style="color:rgb(132,139,152);">.</span><span style="color:rgb(97,175,239);">getExe</span>&nbsp;<span style="color:rgb(171,178,191);">pkgs</span><span style="color:rgb(132,139,152);">.</span><span style="color:rgb(86,182,194);">ly</span><span style="color:rgb(232,102,113);">}</span><span style="color:rgb(152,195,121);">&nbsp;tty1</span><span style="color:rgb(152,195,121);">"</span><span style="color:rgb(132,139,152);">;</span><br><span style="color:rgb(132,139,152);">}</span><br></code></pre></body></html>
-</body></html></dd>
-  </dl>
-  <dl class="option-details option-sources">
-    <dt>Declared in</dt><dd class="option-value"><code><a href="https://github.com/finix-community/finix/blob/main/modules/providers/ttys" target="_blank" rel="noopener noreferrer">&lt;finix/modules/providers/ttys&gt;</a></code></dd>
-  </dl>
-</div>
-<div class="option" id="option-providers.ttys.devices._name_.enable">
-  <h3 class="option-name">
-    <a href="#option-providers.ttys.devices._name_.enable" class="option-anchor">providers.ttys.devices.&lt;name&gt;.enable</a>
-    <button type="button" class="copy-link" aria-label="Copy link to this option" title="Copy link to this option"></button>
-    <span class="copy-feedback">Link copied!</span>
-  </h3>
-  <div class="option-description"><html><head></head><body><p>Whether anything runs on this terminal. A device defined and then disabled
-is still claimed - nothing else takes it - and simply has no prompt.</p>
-</body></html></div>
-  <dl class="option-details">
-    <dt>Type</dt><dd class="option-value"><code>boolean</code></dd>
-    <dt>Default</dt><dd class="option-value"><html><head></head><body><html><head></head><body><pre class="highlight"><code class="language-nix"><span style="color:rgb(209,154,102);">true</span></code></pre></body></html>
-</body></html></dd>
-  </dl>
-  <dl class="option-details option-sources">
-    <dt>Declared in</dt><dd class="option-value"><code><a href="https://github.com/finix-community/finix/blob/main/modules/providers/ttys" target="_blank" rel="noopener noreferrer">&lt;finix/modules/providers/ttys&gt;</a></code></dd>
-  </dl>
-</div>
-<div class="option" id="option-providers.ttys.devices._name_.command">
-  <h3 class="option-name">
-    <a href="#option-providers.ttys.devices._name_.command" class="option-anchor">providers.ttys.devices.&lt;name&gt;.command</a>
-    <button type="button" class="copy-link" aria-label="Copy link to this option" title="Copy link to this option"></button>
-    <span class="copy-feedback">Link copied!</span>
-  </h3>
-  <div class="option-description"><html><head></head><body><p>What to run on this terminal.</p>
-<p>The program opens the device itself - it is given as the command's own
-argument - because claiming the terminal, the session and the process group
-is work only the program can do properly, and every login prompt worth
-running already does it.</p>
-<p><code>null</code> asks for a login prompt: <a class="option-reference" href="options.html#option-providers.ttys.package"><code class="nixos-option">providers.ttys.package</code></a>, or <code>agetty</code>
-where that is also unset.</p>
-</body></html></div>
-  <dl class="option-details">
-    <dt>Type</dt><dd class="option-value"><code>null or main program, path or command</code></dd>
-    <dt>Default</dt><dd class="option-value"><html><head></head><body><html><head></head><body><pre class="highlight"><code class="language-nix"><span style="color:rgb(209,154,102);">null</span></code></pre></body></html>
-</body></html></dd>
-  </dl>
-  <dl class="option-details option-sources">
-    <dt>Declared in</dt><dd class="option-value"><code><a href="https://github.com/finix-community/finix/blob/main/modules/providers/ttys" target="_blank" rel="noopener noreferrer">&lt;finix/modules/providers/ttys&gt;</a></code></dd>
-  </dl>
-</div>
-<div class="option" id="option-providers.ttys.devices._name_.description">
-  <h3 class="option-name">
-    <a href="#option-providers.ttys.devices._name_.description" class="option-anchor">providers.ttys.devices.&lt;name&gt;.description</a>
-    <button type="button" class="copy-link" aria-label="Copy link to this option" title="Copy link to this option"></button>
-    <span class="copy-feedback">Link copied!</span>
-  </h3>
-  <div class="option-description"><html><head></head><body><p>A short human-readable description of this terminal.</p>
-</body></html></div>
-  <dl class="option-details">
-    <dt>Type</dt><dd class="option-value"><code>string</code></dd>
-    <dt>Default</dt><dd class="option-value"><html><head></head><body><html><head></head><body><pre class="highlight"><code class="language-nix"><span style="color:rgb(152,195,121);">"</span><span style="color:rgb(152,195,121);">login&nbsp;prompt&nbsp;on&nbsp;</span><span style="color:rgb(232,102,113);">${</span><span style="color:rgb(171,178,191);">device</span><span style="color:rgb(232,102,113);">}</span><span style="color:rgb(152,195,121);">"</span></code></pre></body></html>
-</body></html></dd>
-  </dl>
-  <dl class="option-details option-sources">
-    <dt>Declared in</dt><dd class="option-value"><code><a href="https://github.com/finix-community/finix/blob/main/modules/providers/ttys" target="_blank" rel="noopener noreferrer">&lt;finix/modules/providers/ttys&gt;</a></code></dd>
-  </dl>
-</div>
-<div class="option" id="option-providers.ttys.devices._name_.requires">
-  <h3 class="option-name">
-    <a href="#option-providers.ttys.devices._name_.requires" class="option-anchor">providers.ttys.devices.&lt;name&gt;.requires</a>
-    <button type="button" class="copy-link" aria-label="Copy link to this option" title="Copy link to this option"></button>
-    <span class="copy-feedback">Link copied!</span>
-  </h3>
-  <div class="option-description"><html><head></head><body><p>The units which must be ready before this terminal is started, in the
-vocabulary of <a class="option-reference" href="options.html#option-providers.services.units"><code class="nixos-option">providers.services.units</code></a>.</p>
-<p><code>multi-user</code> by default: a prompt offered before the system is up is a
-session into a half-built machine.</p>
-</body></html></div>
-  <dl class="option-details">
-    <dt>Type</dt><dd class="option-value"><code>list of string</code></dd>
-    <dt>Default</dt><dd class="option-value"><html><head></head><body><html><head></head><body><pre class="highlight"><code class="language-nix"><span style="color:rgb(132,139,152);">[</span><br>&nbsp;&nbsp;<span style="color:rgb(152,195,121);">"</span><span style="color:rgb(152,195,121);">multi-user</span><span style="color:rgb(152,195,121);">"</span><br><span style="color:rgb(132,139,152);">]</span></code></pre></body></html>
-</body></html></dd>
-  </dl>
-  <dl class="option-details option-sources">
-    <dt>Declared in</dt><dd class="option-value"><code><a href="https://github.com/finix-community/finix/blob/main/modules/providers/ttys" target="_blank" rel="noopener noreferrer">&lt;finix/modules/providers/ttys&gt;</a></code></dd>
-  </dl>
-</div>
-<div class="option" id="option-providers.ttys.extraArgs">
-  <h3 class="option-name">
-    <a href="#option-providers.ttys.extraArgs" class="option-anchor">providers.ttys.extraArgs</a>
-    <button type="button" class="copy-link" aria-label="Copy link to this option" title="Copy link to this option"></button>
-    <span class="copy-feedback">Link copied!</span>
-  </h3>
-  <div class="option-description"><html><head></head><body><p>Additional arguments for the login prompt named by <code class="nixos-option">package</code>, placed where
-<code class="nixos-option">args</code> puts them.</p>
-</body></html></div>
-  <dl class="option-details">
-    <dt>Type</dt><dd class="option-value"><code>list of string</code></dd>
-    <dt>Default</dt><dd class="option-value"><html><head></head><body><html><head></head><body><pre class="highlight"><code class="language-nix"><span style="color:rgb(132,139,152);">[</span>&nbsp;<span style="color:rgb(132,139,152);">]</span></code></pre></body></html>
-</body></html></dd>
-  </dl>
-  <dl class="option-details option-sources">
-    <dt>Declared in</dt><dd class="option-value"><code><a href="https://github.com/finix-community/finix/blob/main/modules/providers/ttys" target="_blank" rel="noopener noreferrer">&lt;finix/modules/providers/ttys&gt;</a></code></dd>
   </dl>
 </div>
 <div class="option" id="option-runit.enable">
@@ -1963,5 +1581,385 @@ for additional details.</p>
   </dl>
   <dl class="option-details option-sources">
     <dt>Declared in</dt><dd class="option-value"><code><a href="https://github.com/finix-community/finix/blob/main/modules/services/avahi" target="_blank" rel="noopener noreferrer">&lt;finix/modules/services/avahi&gt;</a></code></dd>
+  </dl>
+</div>
+<div class="option" id="option-services.avahi.extraArgs">
+  <h3 class="option-name">
+    <a href="#option-services.avahi.extraArgs" class="option-anchor">services.avahi.extraArgs</a>
+    <button type="button" class="copy-link" aria-label="Copy link to this option" title="Copy link to this option"></button>
+    <span class="copy-feedback">Link copied!</span>
+  </h3>
+  <div class="option-description"><html><head></head><body><p>Additional arguments to pass to <code>avahi</code>. See <a href="https://man.archlinux.org/man/avahi-daemon.8" class="manpage-reference">avahi-daemon(8)</a>
+for additional details.</p>
+</body></html></div>
+  <dl class="option-details">
+    <dt>Type</dt><dd class="option-value"><code>list of string</code></dd>
+    <dt>Default</dt><dd class="option-value"><html><head></head><body><html><head></head><body><pre class="highlight"><code class="language-nix"><span style="color:rgb(132,139,152);">[</span>&nbsp;<span style="color:rgb(132,139,152);">]</span></code></pre></body></html>
+</body></html></dd>
+  </dl>
+  <dl class="option-details option-sources">
+    <dt>Declared in</dt><dd class="option-value"><code><a href="https://github.com/finix-community/finix/blob/main/modules/services/avahi" target="_blank" rel="noopener noreferrer">&lt;finix/modules/services/avahi&gt;</a></code></dd>
+  </dl>
+</div>
+<div class="option" id="option-services.avahi.settings">
+  <h3 class="option-name">
+    <a href="#option-services.avahi.settings" class="option-anchor">services.avahi.settings</a>
+    <button type="button" class="copy-link" aria-label="Copy link to this option" title="Copy link to this option"></button>
+    <span class="copy-feedback">Link copied!</span>
+  </h3>
+  <div class="option-description"><html><head></head><body><p><code>avahi</code> configuration. See <a href="https://man.archlinux.org/man/avahi-daemon.conf.5" class="manpage-reference">avahi-daemon.conf(5)</a>
+for additional details.</p>
+</body></html></div>
+  <dl class="option-details">
+    <dt>Type</dt><dd class="option-value"><code>attribute set of section of an INI file (attrs of INI atom (null, bool, int, float or string) or a non-empty list of them)</code></dd>
+    <dt>Default</dt><dd class="option-value"><html><head></head><body><html><head></head><body><pre class="highlight"><code class="language-nix"><span style="color:rgb(132,139,152);">{</span>&nbsp;<span style="color:rgb(132,139,152);">}</span></code></pre></body></html>
+</body></html></dd>
+  </dl>
+  <dl class="option-details option-sources">
+    <dt>Declared in</dt><dd class="option-value"><code><a href="https://github.com/finix-community/finix/blob/main/modules/services/avahi" target="_blank" rel="noopener noreferrer">&lt;finix/modules/services/avahi&gt;</a></code></dd>
+  </dl>
+</div>
+<div class="option" id="option-services.blocky.enable">
+  <h3 class="option-name">
+    <a href="#option-services.blocky.enable" class="option-anchor">services.blocky.enable</a>
+    <button type="button" class="copy-link" aria-label="Copy link to this option" title="Copy link to this option"></button>
+    <span class="copy-feedback">Link copied!</span>
+  </h3>
+  <div class="option-description"><html><head></head><body><p>Whether to enable <a href="https://0xerr0r.github.io/blocky">blocky</a> as a system service.</p>
+</body></html></div>
+  <dl class="option-details">
+    <dt>Type</dt><dd class="option-value"><code>boolean</code></dd>
+    <dt>Default</dt><dd class="option-value"><html><head></head><body><html><head></head><body><pre class="highlight"><code class="language-nix"><span style="color:rgb(209,154,102);">false</span></code></pre></body></html>
+</body></html></dd>
+  </dl>
+  <dl class="option-details option-sources">
+    <dt>Declared in</dt><dd class="option-value"><code><a href="https://github.com/finix-community/finix/blob/main/modules/services/blocky" target="_blank" rel="noopener noreferrer">&lt;finix/modules/services/blocky&gt;</a></code></dd>
+  </dl>
+</div>
+<div class="option" id="option-services.blocky.package">
+  <h3 class="option-name">
+    <a href="#option-services.blocky.package" class="option-anchor">services.blocky.package</a>
+    <button type="button" class="copy-link" aria-label="Copy link to this option" title="Copy link to this option"></button>
+    <span class="copy-feedback">Link copied!</span>
+  </h3>
+  <div class="option-description"><html><head></head><body><p>The package to use for <code>blocky</code>.</p>
+</body></html></div>
+  <dl class="option-details">
+    <dt>Type</dt><dd class="option-value"><code>package</code></dd>
+    <dt>Default</dt><dd class="option-value"><html><head></head><body><html><head></head><body><pre class="highlight"><code class="language-nix"><span style="color:rgb(171,178,191);">pkgs</span><span style="color:rgb(132,139,152);">.</span><span style="color:rgb(86,182,194);">blocky</span></code></pre></body></html>
+</body></html></dd>
+  </dl>
+  <dl class="option-details option-sources">
+    <dt>Declared in</dt><dd class="option-value"><code><a href="https://github.com/finix-community/finix/blob/main/modules/services/blocky" target="_blank" rel="noopener noreferrer">&lt;finix/modules/services/blocky&gt;</a></code></dd>
+  </dl>
+</div>
+<div class="option" id="option-services.blocky.debug">
+  <h3 class="option-name">
+    <a href="#option-services.blocky.debug" class="option-anchor">services.blocky.debug</a>
+    <button type="button" class="copy-link" aria-label="Copy link to this option" title="Copy link to this option"></button>
+    <span class="copy-feedback">Link copied!</span>
+  </h3>
+  <div class="option-description"><html><head></head><body><p>Whether to enable debug logging.</p>
+</body></html></div>
+  <dl class="option-details">
+    <dt>Type</dt><dd class="option-value"><code>boolean</code></dd>
+    <dt>Default</dt><dd class="option-value"><html><head></head><body><html><head></head><body><pre class="highlight"><code class="language-nix"><span style="color:rgb(209,154,102);">false</span></code></pre></body></html>
+</body></html></dd>
+  </dl>
+  <dl class="option-details option-sources">
+    <dt>Declared in</dt><dd class="option-value"><code><a href="https://github.com/finix-community/finix/blob/main/modules/services/blocky" target="_blank" rel="noopener noreferrer">&lt;finix/modules/services/blocky&gt;</a></code></dd>
+  </dl>
+</div>
+<div class="option" id="option-services.blocky.group">
+  <h3 class="option-name">
+    <a href="#option-services.blocky.group" class="option-anchor">services.blocky.group</a>
+    <button type="button" class="copy-link" aria-label="Copy link to this option" title="Copy link to this option"></button>
+    <span class="copy-feedback">Link copied!</span>
+  </h3>
+  <div class="option-description"><html><head></head><body><p>Group account under which <code>blocky</code> runs.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>If left as the default value this group will automatically be created
+on system activation, otherwise you are responsible for
+ensuring the group exists before the <code>blocky</code> service starts.</p>
+</div>
+</body></html></div>
+  <dl class="option-details">
+    <dt>Type</dt><dd class="option-value"><code>string</code></dd>
+    <dt>Default</dt><dd class="option-value"><html><head></head><body><html><head></head><body><pre class="highlight"><code class="language-nix"><span style="color:rgb(152,195,121);">"</span><span style="color:rgb(152,195,121);">blocky</span><span style="color:rgb(152,195,121);">"</span></code></pre></body></html>
+</body></html></dd>
+  </dl>
+  <dl class="option-details option-sources">
+    <dt>Declared in</dt><dd class="option-value"><code><a href="https://github.com/finix-community/finix/blob/main/modules/services/blocky" target="_blank" rel="noopener noreferrer">&lt;finix/modules/services/blocky&gt;</a></code></dd>
+  </dl>
+</div>
+<div class="option" id="option-services.blocky.settings">
+  <h3 class="option-name">
+    <a href="#option-services.blocky.settings" class="option-anchor">services.blocky.settings</a>
+    <button type="button" class="copy-link" aria-label="Copy link to this option" title="Copy link to this option"></button>
+    <span class="copy-feedback">Link copied!</span>
+  </h3>
+  <div class="option-description"><html><head></head><body><p><code>blocky</code> configuration. See <a href="https://0xerr0r.github.io/blocky/configuration">upstream documentation</a>
+for additional details.</p>
+</body></html></div>
+  <dl class="option-details">
+    <dt>Type</dt><dd class="option-value"><code>YAML 1.1 value</code></dd>
+    <dt>Default</dt><dd class="option-value"><html><head></head><body><html><head></head><body><pre class="highlight"><code class="language-nix"><span style="color:rgb(132,139,152);">{</span>&nbsp;<span style="color:rgb(132,139,152);">}</span></code></pre></body></html>
+</body></html></dd>
+  </dl>
+  <dl class="option-details option-sources">
+    <dt>Declared in</dt><dd class="option-value"><code><a href="https://github.com/finix-community/finix/blob/main/modules/services/blocky" target="_blank" rel="noopener noreferrer">&lt;finix/modules/services/blocky&gt;</a></code></dd>
+  </dl>
+</div>
+<div class="option" id="option-services.blocky.user">
+  <h3 class="option-name">
+    <a href="#option-services.blocky.user" class="option-anchor">services.blocky.user</a>
+    <button type="button" class="copy-link" aria-label="Copy link to this option" title="Copy link to this option"></button>
+    <span class="copy-feedback">Link copied!</span>
+  </h3>
+  <div class="option-description"><html><head></head><body><p>User account under which <code>blocky</code> runs.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>If left as the default value this user will automatically be created
+on system activation, otherwise you are responsible for
+ensuring the user exists before the <code>blocky</code> service starts.</p>
+</div>
+</body></html></div>
+  <dl class="option-details">
+    <dt>Type</dt><dd class="option-value"><code>string</code></dd>
+    <dt>Default</dt><dd class="option-value"><html><head></head><body><html><head></head><body><pre class="highlight"><code class="language-nix"><span style="color:rgb(152,195,121);">"</span><span style="color:rgb(152,195,121);">blocky</span><span style="color:rgb(152,195,121);">"</span></code></pre></body></html>
+</body></html></dd>
+  </dl>
+  <dl class="option-details option-sources">
+    <dt>Declared in</dt><dd class="option-value"><code><a href="https://github.com/finix-community/finix/blob/main/modules/services/blocky" target="_blank" rel="noopener noreferrer">&lt;finix/modules/services/blocky&gt;</a></code></dd>
+  </dl>
+</div>
+<div class="option" id="option-services.bluetooth.enable">
+  <h3 class="option-name">
+    <a href="#option-services.bluetooth.enable" class="option-anchor">services.bluetooth.enable</a>
+    <button type="button" class="copy-link" aria-label="Copy link to this option" title="Copy link to this option"></button>
+    <span class="copy-feedback">Link copied!</span>
+  </h3>
+  <div class="option-description"><html><head></head><body><p>Whether to enable <a href="https://bluez.github.io/">bluez</a> as a system service.</p>
+</body></html></div>
+  <dl class="option-details">
+    <dt>Type</dt><dd class="option-value"><code>boolean</code></dd>
+    <dt>Default</dt><dd class="option-value"><html><head></head><body><html><head></head><body><pre class="highlight"><code class="language-nix"><span style="color:rgb(209,154,102);">false</span></code></pre></body></html>
+</body></html></dd>
+  </dl>
+  <dl class="option-details option-sources">
+    <dt>Declared in</dt><dd class="option-value"><code><a href="https://github.com/finix-community/finix/blob/main/modules/services/bluetooth" target="_blank" rel="noopener noreferrer">&lt;finix/modules/services/bluetooth&gt;</a></code></dd>
+  </dl>
+</div>
+<div class="option" id="option-services.bluetooth.package">
+  <h3 class="option-name">
+    <a href="#option-services.bluetooth.package" class="option-anchor">services.bluetooth.package</a>
+    <button type="button" class="copy-link" aria-label="Copy link to this option" title="Copy link to this option"></button>
+    <span class="copy-feedback">Link copied!</span>
+  </h3>
+  <div class="option-description"><html><head></head><body><p>The package to use for <code>bluez</code>.</p>
+</body></html></div>
+  <dl class="option-details">
+    <dt>Type</dt><dd class="option-value"><code>package</code></dd>
+    <dt>Default</dt><dd class="option-value"><html><head></head><body><html><head></head><body><pre class="highlight"><code class="language-nix"><span style="color:rgb(171,178,191);">pkgs</span><span style="color:rgb(132,139,152);">.</span><span style="color:rgb(86,182,194);">bluez</span></code></pre></body></html>
+</body></html></dd>
+  </dl>
+  <dl class="option-details option-sources">
+    <dt>Declared in</dt><dd class="option-value"><code><a href="https://github.com/finix-community/finix/blob/main/modules/services/bluetooth" target="_blank" rel="noopener noreferrer">&lt;finix/modules/services/bluetooth&gt;</a></code></dd>
+  </dl>
+</div>
+<div class="option" id="option-services.bluetooth.debug">
+  <h3 class="option-name">
+    <a href="#option-services.bluetooth.debug" class="option-anchor">services.bluetooth.debug</a>
+    <button type="button" class="copy-link" aria-label="Copy link to this option" title="Copy link to this option"></button>
+    <span class="copy-feedback">Link copied!</span>
+  </h3>
+  <div class="option-description"><html><head></head><body><p>Whether to enable debug logging.</p>
+</body></html></div>
+  <dl class="option-details">
+    <dt>Type</dt><dd class="option-value"><code>boolean</code></dd>
+    <dt>Default</dt><dd class="option-value"><html><head></head><body><html><head></head><body><pre class="highlight"><code class="language-nix"><span style="color:rgb(209,154,102);">false</span></code></pre></body></html>
+</body></html></dd>
+  </dl>
+  <dl class="option-details option-sources">
+    <dt>Declared in</dt><dd class="option-value"><code><a href="https://github.com/finix-community/finix/blob/main/modules/services/bluetooth" target="_blank" rel="noopener noreferrer">&lt;finix/modules/services/bluetooth&gt;</a></code></dd>
+  </dl>
+</div>
+<div class="option" id="option-services.bluetooth.settings">
+  <h3 class="option-name">
+    <a href="#option-services.bluetooth.settings" class="option-anchor">services.bluetooth.settings</a>
+    <button type="button" class="copy-link" aria-label="Copy link to this option" title="Copy link to this option"></button>
+    <span class="copy-feedback">Link copied!</span>
+  </h3>
+  <div class="option-description"><html><head></head><body><p><code>bluez</code> configuration. See <a href="https://github.com/bluez/bluez/blob/master/src/main.conf">upstream documentation</a>
+for additional details.</p>
+</body></html></div>
+  <dl class="option-details">
+    <dt>Type</dt><dd class="option-value"><code>attribute set of section of an INI file (attrs of INI atom (null, bool, int, float or string))</code></dd>
+    <dt>Default</dt><dd class="option-value"><html><head></head><body><html><head></head><body><pre class="highlight"><code class="language-nix"><span style="color:rgb(132,139,152);">{</span>&nbsp;<span style="color:rgb(132,139,152);">}</span></code></pre></body></html>
+</body></html></dd>
+  </dl>
+  <dl class="option-details option-sources">
+    <dt>Declared in</dt><dd class="option-value"><code><a href="https://github.com/finix-community/finix/blob/main/modules/services/bluetooth" target="_blank" rel="noopener noreferrer">&lt;finix/modules/services/bluetooth&gt;</a></code></dd>
+  </dl>
+</div>
+<div class="option" id="option-services.chrony.enable">
+  <h3 class="option-name">
+    <a href="#option-services.chrony.enable" class="option-anchor">services.chrony.enable</a>
+    <button type="button" class="copy-link" aria-label="Copy link to this option" title="Copy link to this option"></button>
+    <span class="copy-feedback">Link copied!</span>
+  </h3>
+  <div class="option-description"><html><head></head><body><p>Whether to enable <a href="https://chrony-project.org/">chrony</a> as a system service.</p>
+</body></html></div>
+  <dl class="option-details">
+    <dt>Type</dt><dd class="option-value"><code>boolean</code></dd>
+    <dt>Default</dt><dd class="option-value"><html><head></head><body><html><head></head><body><pre class="highlight"><code class="language-nix"><span style="color:rgb(209,154,102);">false</span></code></pre></body></html>
+</body></html></dd>
+  </dl>
+  <dl class="option-details option-sources">
+    <dt>Declared in</dt><dd class="option-value"><code><a href="https://github.com/finix-community/finix/blob/main/modules/services/chronyd" target="_blank" rel="noopener noreferrer">&lt;finix/modules/services/chronyd&gt;</a></code></dd>
+  </dl>
+</div>
+<div class="option" id="option-services.chrony.package">
+  <h3 class="option-name">
+    <a href="#option-services.chrony.package" class="option-anchor">services.chrony.package</a>
+    <button type="button" class="copy-link" aria-label="Copy link to this option" title="Copy link to this option"></button>
+    <span class="copy-feedback">Link copied!</span>
+  </h3>
+  <div class="option-description"><html><head></head><body><p>The package to use for <code>chrony</code>.</p>
+</body></html></div>
+  <dl class="option-details">
+    <dt>Type</dt><dd class="option-value"><code>package</code></dd>
+    <dt>Default</dt><dd class="option-value"><html><head></head><body><html><head></head><body><pre class="highlight"><code class="language-nix"><span style="color:rgb(171,178,191);">pkgs</span><span style="color:rgb(132,139,152);">.</span><span style="color:rgb(86,182,194);">chrony</span></code></pre></body></html>
+</body></html></dd>
+  </dl>
+  <dl class="option-details option-sources">
+    <dt>Declared in</dt><dd class="option-value"><code><a href="https://github.com/finix-community/finix/blob/main/modules/services/chronyd" target="_blank" rel="noopener noreferrer">&lt;finix/modules/services/chronyd&gt;</a></code></dd>
+  </dl>
+</div>
+<div class="option" id="option-services.chrony.configFile">
+  <h3 class="option-name">
+    <a href="#option-services.chrony.configFile" class="option-anchor">services.chrony.configFile</a>
+    <button type="button" class="copy-link" aria-label="Copy link to this option" title="Copy link to this option"></button>
+    <span class="copy-feedback">Link copied!</span>
+  </h3>
+  <div class="option-description"><html><head></head><body><p>This option has no description.</p>
+</body></html></div>
+  <dl class="option-details">
+    <dt>Type</dt><dd class="option-value"><code>absolute path</code></dd>
+    <dt>Default</dt><dd class="option-value"><html><head></head><body><html><head></head><body><pre class="highlight"><code class="language-nix">&lt;<span style="color:rgb(86,182,194);">derivation</span>&nbsp;<span style="color:rgb(171,178,191);">chrony</span><span style="color:rgb(132,139,152);">.</span><span style="color:rgb(86,182,194);">conf</span>&gt;</code></pre></body></html>
+</body></html></dd>
+  </dl>
+  <dl class="option-details option-sources">
+    <dt>Declared in</dt><dd class="option-value"><code><a href="https://github.com/finix-community/finix/blob/main/modules/services/chronyd" target="_blank" rel="noopener noreferrer">&lt;finix/modules/services/chronyd&gt;</a></code></dd>
+  </dl>
+</div>
+<div class="option" id="option-services.chrony.debug">
+  <h3 class="option-name">
+    <a href="#option-services.chrony.debug" class="option-anchor">services.chrony.debug</a>
+    <button type="button" class="copy-link" aria-label="Copy link to this option" title="Copy link to this option"></button>
+    <span class="copy-feedback">Link copied!</span>
+  </h3>
+  <div class="option-description"><html><head></head><body><p>Whether to enable debug logging.</p>
+</body></html></div>
+  <dl class="option-details">
+    <dt>Type</dt><dd class="option-value"><code>boolean</code></dd>
+    <dt>Default</dt><dd class="option-value"><html><head></head><body><html><head></head><body><pre class="highlight"><code class="language-nix"><span style="color:rgb(209,154,102);">false</span></code></pre></body></html>
+</body></html></dd>
+  </dl>
+  <dl class="option-details option-sources">
+    <dt>Declared in</dt><dd class="option-value"><code><a href="https://github.com/finix-community/finix/blob/main/modules/services/chronyd" target="_blank" rel="noopener noreferrer">&lt;finix/modules/services/chronyd&gt;</a></code></dd>
+  </dl>
+</div>
+<div class="option" id="option-services.chrony.extraArgs">
+  <h3 class="option-name">
+    <a href="#option-services.chrony.extraArgs" class="option-anchor">services.chrony.extraArgs</a>
+    <button type="button" class="copy-link" aria-label="Copy link to this option" title="Copy link to this option"></button>
+    <span class="copy-feedback">Link copied!</span>
+  </h3>
+  <div class="option-description"><html><head></head><body><p>Additional arguments to pass to <code>chrony</code>. See <a href="https://man.archlinux.org/man/chronyd.8" class="manpage-reference">chronyd(8)</a>
+for additional details.</p>
+</body></html></div>
+  <dl class="option-details">
+    <dt>Type</dt><dd class="option-value"><code>list of string</code></dd>
+    <dt>Default</dt><dd class="option-value"><html><head></head><body><html><head></head><body><pre class="highlight"><code class="language-nix"><span style="color:rgb(132,139,152);">[</span>&nbsp;<span style="color:rgb(132,139,152);">]</span></code></pre></body></html>
+</body></html></dd>
+  </dl>
+  <dl class="option-details option-sources">
+    <dt>Declared in</dt><dd class="option-value"><code><a href="https://github.com/finix-community/finix/blob/main/modules/services/chronyd" target="_blank" rel="noopener noreferrer">&lt;finix/modules/services/chronyd&gt;</a></code></dd>
+  </dl>
+</div>
+<div class="option" id="option-services.cron.enable">
+  <h3 class="option-name">
+    <a href="#option-services.cron.enable" class="option-anchor">services.cron.enable</a>
+    <button type="button" class="copy-link" aria-label="Copy link to this option" title="Copy link to this option"></button>
+    <span class="copy-feedback">Link copied!</span>
+  </h3>
+  <div class="option-description"><html><head></head><body><p>Whether to enable <a href="https://github.com/cronie-crond/cronie">cron</a> as a system service.</p>
+</body></html></div>
+  <dl class="option-details">
+    <dt>Type</dt><dd class="option-value"><code>boolean</code></dd>
+    <dt>Default</dt><dd class="option-value"><html><head></head><body><html><head></head><body><pre class="highlight"><code class="language-nix"><span style="color:rgb(209,154,102);">false</span></code></pre></body></html>
+</body></html></dd>
+  </dl>
+  <dl class="option-details option-sources">
+    <dt>Declared in</dt><dd class="option-value"><code><a href="https://github.com/finix-community/finix/blob/main/modules/services/cron" target="_blank" rel="noopener noreferrer">&lt;finix/modules/services/cron&gt;</a></code></dd>
+  </dl>
+</div>
+<div class="option" id="option-services.cron.package">
+  <h3 class="option-name">
+    <a href="#option-services.cron.package" class="option-anchor">services.cron.package</a>
+    <button type="button" class="copy-link" aria-label="Copy link to this option" title="Copy link to this option"></button>
+    <span class="copy-feedback">Link copied!</span>
+  </h3>
+  <div class="option-description"><html><head></head><body><p>The package to use for <code>cron</code>.</p>
+</body></html></div>
+  <dl class="option-details">
+    <dt>Type</dt><dd class="option-value"><code>package</code></dd>
+    <dt>Default</dt><dd class="option-value"><html><head></head><body><html><head></head><body><pre class="highlight"><code class="language-nix"><span style="color:rgb(171,178,191);">pkgs</span><span style="color:rgb(132,139,152);">.</span><span style="color:rgb(86,182,194);">cronie</span></code></pre></body></html>
+</body></html></dd>
+    <dt>Example</dt><dd class="option-value"><html><head></head><body><html><head></head><body><pre class="highlight"><code class="language-nix"><span style="color:rgb(171,178,191);">pkgs</span><span style="color:rgb(132,139,152);">.</span><span style="color:rgb(86,182,194);">cron</span><span style="color:rgb(132,139,152);">.</span><span style="color:rgb(97,175,239);">override</span>&nbsp;<span style="color:rgb(132,139,152);">{</span><br>&nbsp;&nbsp;<span style="color:rgb(86,182,194);">sendmailPath</span>&nbsp;<span style="color:rgb(171,178,191);">=</span>&nbsp;<span style="color:rgb(152,195,121);">"</span><span style="color:rgb(152,195,121);">/run/wrappers/bin/sendmail</span><span style="color:rgb(152,195,121);">"</span><span style="color:rgb(132,139,152);">;</span><br><span style="color:rgb(132,139,152);">}</span><span style="color:rgb(132,139,152);">;</span><br></code></pre></body></html>
+</body></html></dd>
+  </dl>
+  <dl class="option-details option-sources">
+    <dt>Declared in</dt><dd class="option-value"><code><a href="https://github.com/finix-community/finix/blob/main/modules/services/cron" target="_blank" rel="noopener noreferrer">&lt;finix/modules/services/cron&gt;</a></code></dd>
+  </dl>
+</div>
+<div class="option" id="option-services.cron.extraArgs">
+  <h3 class="option-name">
+    <a href="#option-services.cron.extraArgs" class="option-anchor">services.cron.extraArgs</a>
+    <button type="button" class="copy-link" aria-label="Copy link to this option" title="Copy link to this option"></button>
+    <span class="copy-feedback">Link copied!</span>
+  </h3>
+  <div class="option-description"><html><head></head><body><p>Additional arguments to pass to <code>cron</code>. See <a href="https://man.archlinux.org/man/cron.8" class="manpage-reference">cron(8)</a>
+for additional details.</p>
+</body></html></div>
+  <dl class="option-details">
+    <dt>Type</dt><dd class="option-value"><code>list of string</code></dd>
+    <dt>Default</dt><dd class="option-value"><html><head></head><body><html><head></head><body><pre class="highlight"><code class="language-nix"><span style="color:rgb(132,139,152);">[</span>&nbsp;<span style="color:rgb(132,139,152);">]</span></code></pre></body></html>
+</body></html></dd>
+    <dt>Example</dt><dd class="option-value"><html><head></head><body><html><head></head><body><pre class="highlight"><code class="language-nix"><span style="color:rgb(132,139,152);">[</span><br>&nbsp;&nbsp;<span style="color:rgb(152,195,121);">"</span><span style="color:rgb(152,195,121);">-s</span><span style="color:rgb(152,195,121);">"</span><br><span style="color:rgb(132,139,152);">]</span></code></pre></body></html>
+</body></html></dd>
+  </dl>
+  <dl class="option-details option-sources">
+    <dt>Declared in</dt><dd class="option-value"><code><a href="https://github.com/finix-community/finix/blob/main/modules/services/cron" target="_blank" rel="noopener noreferrer">&lt;finix/modules/services/cron&gt;</a></code></dd>
+  </dl>
+</div>
+<div class="option" id="option-services.cron.settings">
+  <h3 class="option-name">
+    <a href="#option-services.cron.settings" class="option-anchor">services.cron.settings</a>
+    <button type="button" class="copy-link" aria-label="Copy link to this option" title="Copy link to this option"></button>
+    <span class="copy-feedback">Link copied!</span>
+  </h3>
+  <div class="option-description"><html><head></head><body><p><code>crontab</code> configuration. See <a href="https://man.archlinux.org/man/crontab.5" class="manpage-reference">crontab(5)</a>
+for additional details.</p>
+</body></html></div>
+  <dl class="option-details">
+    <dt>Type</dt><dd class="option-value"><code>open submodule of attribute set of string</code></dd>
+    <dt>Default</dt><dd class="option-value"><html><head></head><body><html><head></head><body><pre class="highlight"><code class="language-nix"><span style="color:rgb(132,139,152);">{</span>&nbsp;<span style="color:rgb(132,139,152);">}</span></code></pre></body></html>
+</body></html></dd>
+  </dl>
+  <dl class="option-details option-sources">
+    <dt>Declared in</dt><dd class="option-value"><code><a href="https://github.com/finix-community/finix/blob/main/modules/services/cron" target="_blank" rel="noopener noreferrer">&lt;finix/modules/services/cron&gt;</a></code></dd>
   </dl>
 </div>
