@@ -60,12 +60,22 @@ let
   unitId = idOf "u_";
 
   # a unit which requires nothing, and so starts the moment the machine does, beside the
-  # filesystems being mounted. Nothing about where it is drawn changes, but it is outlined for
-  # it, because that is the shape a missing edge takes: a daemon which forgot to name
-  # `tmpfiles-setup` starts before its state directory exists and looks, here, like a root.
+  # filesystems being mounted. Drawn hanging off `start`, so the picture has one entry point -
+  # and so a missing edge is easy to see: a daemon which forgot to name `tmpfiles-setup` starts
+  # before its state directory exists and shows up, here, as a direct child of `start`.
   #
   # Not a shutdown unit, which runs once everything has stopped and is not started at all.
   isRoot = unit: unit.requires == [ ] && kindOf unit != "shutdown";
+
+  # a shutdown unit which requires no other shutdown unit, and so runs first on the way down
+  isFirstDown = unit: kindOf unit == "shutdown" && unit.requires == [ ];
+
+  # the drawing's own nodes rather than units: where the boot and the shutdown begin. Their own
+  # prefix, so a unit which happens to be called `start` stays a node of its own.
+  #
+  # Their edges are dotted, because they are not anything the configuration declared.
+  startId = "g_start";
+  stopId = "g_stop";
 
   # shape carries the kind, so the picture says what a node is without a legend: a rounded box
   # is a long-running service, a square box something which runs once, and a trapezoid a step
@@ -99,6 +109,7 @@ let
     map (dep: "  ${unitId dep} --> ${unitId name}") (lib.filter (dep: enabled ? ${dep}) unit.requires);
 
   roots = lib.attrNames (lib.filterAttrs (_: isRoot) enabled);
+  firstDown = lib.attrNames (lib.filterAttrs (_: isFirstDown) enabled);
 
   # a user's tree, drawn beside the system's rather than in it.
   #
@@ -118,14 +129,25 @@ let
       # every node in this tree carries
       prefix = idOf "s_" user + "_";
       nid = idOf prefix;
+
+      # the tree's own entry point: what its supervisor starts with, once the session has
+      # started the supervisor. Not the system's `start`, which would draw an ordering between
+      # the two graphs that does not exist.
+      #
+      # `g_` after the prefix, the way the system's own nodes have it, so a user unit called
+      # `session` is not merged into this
+      sessionId = "${prefix}g_session";
+      treeRoots = lib.attrNames (lib.filterAttrs (_: isRoot) units);
     in
     [
       "  subgraph ${prefix}tree[\"${user} · ${toString (lib.length (lib.attrNames units))} units\"]"
       "    direction LR"
+      "    ${sessionId}((session)):::entry"
     ]
     ++ lib.mapAttrsToList (
       name: unit: "    ${shapeFor (kindOf unit) (nid name) ''"${name}<br/>${kindOf unit}"''}"
     ) units
+    ++ map (r: "    ${sessionId} -.-> ${nid r}") treeRoots
     ++ lib.concatLists (
       lib.mapAttrsToList (
         name: unit:
@@ -145,23 +167,24 @@ let
       # left to right, because that is the direction the boot runs in
       "flowchart LR"
       "  %% rounded: service. square: oneshot. trapezoid: shutdown, run once on the way down."
-      "  %% dashed outline: requires nothing, so starts the moment the machine does."
+      "  %% circles are the drawing's, not units: where the boot, the shutdown and each user's"
+      "  %% tree begin. Their dotted edges lead to what requires nothing."
       "  classDef service fill:#0b3b57,stroke:#3b9fd9,color:#e6f4ff"
       "  classDef oneshot fill:#2e2712,stroke:#a98520,color:#fdf3d8"
       "  classDef shutdown fill:#2a1b3d,stroke:#8b6cc4,color:#efe7fb"
-      "  classDef root stroke-dasharray:4 3,stroke-width:2px"
+      "  classDef entry fill:#1f2933,stroke:#9aa5b1,color:#f5f7fa"
       ""
+      "  ${startId}((start)):::entry"
     ]
+    ++ lib.optional (firstDown != [ ]) "  ${stopId}((stop)):::entry"
 
     # the nodes first and the edges after, so that a node is declared once with its shape and
     # class rather than picking them up from whichever edge happened to mention it first
     ++ lib.mapAttrsToList (name: unit: "  ${nodeFor name unit}") enabled
     ++ [ "" ]
+    ++ map (r: "  ${startId} -.-> ${unitId r}") roots
+    ++ map (r: "  ${stopId} -.-> ${unitId r}") firstDown
     ++ lib.concatLists (lib.mapAttrsToList edgesOf enabled)
-    ++ [ "" ]
-
-    # a second class on top of the kind's, so a root keeps its kind's colour
-    ++ lib.optional (roots != [ ]) "  class ${lib.concatMapStringsSep "," unitId roots} root"
     ++ [ "" ]
 
     # the per-user trees last, so the system graph reads top to bottom before them

@@ -40,8 +40,7 @@ let
           type.oneshot.command = "/bin/after-demo";
         };
 
-        # requires nothing, so it starts with the boot - which the chart outlines. Named to sort
-        # first, so the line listing the roots begins with it and can be matched exactly.
+        # requires nothing, so it starts with the boot - which the chart draws hanging off start
         aaa-early = {
           type.oneshot.command = "/bin/early";
         };
@@ -83,8 +82,16 @@ let
       why = "a shutdown unit is drawn as one";
     }
     {
-      line = "  class u_aaa_early,";
-      why = "a unit which requires nothing is outlined, since it starts with the boot";
+      line = "  g_start((start)):::entry";
+      why = "the boot has one entry point, so the picture does";
+    }
+    {
+      line = "  g_start -.-> u_aaa_early";
+      why = "a unit which requires nothing hangs off start, since it starts with the boot";
+    }
+    {
+      line = "  g_stop -.-> u_on_the_way_out";
+      why = "a shutdown unit which requires nothing hangs off stop, since it runs first on the way down";
     }
   ];
 
@@ -94,11 +101,11 @@ let
       why = "the graph is drawn as it is - units, and the edges between them - with nothing boxed, grouped or collapsed";
     }
     {
-      line = ",u_demo,";
+      line = "g_start -.-> u_demo";
       why = "a unit which requires something is not a root";
     }
     {
-      line = ",u_on_the_way_out";
+      line = "g_start -.-> u_on_the_way_out";
       why = "a shutdown unit is not started at all, so it is not a root either";
     }
   ];
