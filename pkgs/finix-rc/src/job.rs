@@ -80,14 +80,6 @@ pub fn run(manifest: &Manifest, name: &str) -> ExitCode {
     apply_environment(unit);
 
     match unit.kind {
-        Kind::Anchor => {
-            // a name to synchronise on, with nothing behind it.
-            if let Err(e) = latches.stamp(name) {
-                eprintln!("finix-rc job {name}: stamping latch: {e}");
-                return ExitCode::from(1);
-            }
-            ExitCode::SUCCESS
-        }
         Kind::Oneshot => oneshot(&latches, manifest, name, unit),
         Kind::Service => service(&latches, manifest, name, unit),
     }
@@ -196,10 +188,7 @@ fn command_argv(manifest: &Manifest, unit: &Unit, command: &str) -> Command {
 /// No new session, which matches what the shell did: a oneshot is not supervised and nothing
 /// signals it by group, so there is nothing for one to buy.
 fn oneshot(latches: &Latches, manifest: &Manifest, name: &str, unit: &Unit) -> ExitCode {
-    let Some(command) = &unit.command else {
-        eprintln!("finix-rc job {name}: oneshot with no command");
-        return ExitCode::from(1);
-    };
+    let command = &unit.command;
 
     let status = spawn_logged(&mut command_argv(manifest, unit, command))
         .and_then(|mut child| child.wait());
@@ -283,10 +272,7 @@ fn service(latches: &Latches, manifest: &Manifest, name: &str, unit: &Unit) -> E
 /// than before the next start: `rc.shutdown` and `switch.deactivate` both write it before they
 /// signal, precisely so that the TERM they send does not get answered by a fresh start.
 fn supervise(latches: &Latches, manifest: &Manifest, name: &str, unit: &Unit) -> ExitCode {
-    let Some(command) = &unit.command else {
-        eprintln!("finix-rc job {name}: service with no command");
-        return ExitCode::from(1);
-    };
+    let command = &unit.command;
 
     let stop = latches.stop(name);
     let pidfile = latches.pid(name);

@@ -36,12 +36,19 @@ rec {
     ${mkdir} -p ${markerDir} 2>/dev/null || :
   '';
 
-  # appends its name to a single file, so the file is a record of the order units started in
+  # appends its name to a single file, so the file is a record of the order units started in.
+  #
+  # Then touches `recorded name`, which is what a recorder's readiness has to wait on: under the
+  # default `fork` readiness a unit is ready once spawned, so the next one in a chain can be
+  # spawned - and win the race to the file - before this shell has written anything.
+  recorded = name: "${markerDir}/${name}.recorded";
+
   recorder =
     name:
     pkgs.writeShellScript "record-${name}" ''
       ${preamble}
       echo ${name} >> ${markerDir}/order
+      ${touch} ${recorded name}
       exec ${sleep} infinity
     '';
 
@@ -85,14 +92,16 @@ rec {
       exec ${sleep} infinity
     '';
 
-  # the portable "the system is up" gate. `running` is the last boot level and has nothing
-  # attached to it, so a unit which requires it runs once userspace is up - on every backend,
-  # without asking the supervisor anything.
+  # the portable "the system is up" gate: a unit requiring every other unit the machine starts,
+  # so it runs once all of them are ready - on every backend, without asking the supervisor
+  # anything. Given the machine's units, since what "every other" is depends on them.
   bootedMarker = "${markerDir}/booted";
 
-  bootedUnit = {
+  bootedUnit = units: {
     description = "userspace is up";
-    requires = [ "running" ];
+    requires = lib.attrNames (
+      lib.filterAttrs (name: unit: name != "booted" && unit.enable && !(unit.type ? shutdown)) units
+    );
     type.oneshot.command = pkgs.writeShellScript "booted" ''
       ${preamble}
       ${touch} ${bootedMarker}

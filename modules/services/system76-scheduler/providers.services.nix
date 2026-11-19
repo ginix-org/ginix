@@ -17,9 +17,14 @@ in
     providers.services.units.system76-scheduler = {
       description = "system76 scheduler";
 
-      # the bus and its socket gate are in the head tier, so `service/dbus/ready` is behind
-      # this without being named
-      requires = [ "basic" ];
+      # the bus, which is how it is reached - what `service/dbus/ready` said - and the logger
+      requires = [
+        "tmpfiles-setup"
+      ]
+      ++ config.providers.services.lib.present [
+        "syslogd"
+        "dbus"
+      ];
 
       type.service = {
         command = "${lib.getExe cfg.package} daemon";

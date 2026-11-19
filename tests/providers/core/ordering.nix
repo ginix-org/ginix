@@ -24,22 +24,32 @@ in
     {
       imports = [ (import ./base.nix { inherit backend coreLib; }) ];
 
-      providers.services.units = {
-        first = {
-          type.service.command = coreLib.recorder "first";
-          requires = [ "sysinit" ];
-        };
+      # ready once each has written itself down: with the default `fork` readiness a unit is
+      # ready on being spawned, and the order would be a race between shells rather than the
+      # graph's
+      providers.services.units =
+        let
+          recording = name: {
+            command = coreLib.recorder name;
+            readiness.waitFor.path.path = coreLib.recorded name;
+          };
+        in
+        {
+          first = {
+            type.service = recording "first";
+            requires = [ "tmpfiles-setup" ];
+          };
 
-        second = {
-          type.service.command = coreLib.recorder "second";
-          requires = [ "first" ];
-        };
+          second = {
+            type.service = recording "second";
+            requires = [ "first" ];
+          };
 
-        third = {
-          type.service.command = coreLib.recorder "third";
-          requires = [ "second" ];
+          third = {
+            type.service = recording "third";
+            requires = [ "second" ];
+          };
         };
-      };
     };
 
   testScript = ''

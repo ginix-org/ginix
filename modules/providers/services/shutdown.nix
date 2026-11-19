@@ -1,76 +1,46 @@
-# the shutdown side of the trunk, as one script
+# the shutdown side, as one script
 #
-# A normal trunk level means "everything before me has started". The latch cannot mean that: it
-# means "everything before me has *stopped*", which is not a fact about starting and so has no
-# edge to hang on. Units attached to it or to a level after it therefore run on the way down.
-#
-# That asks two things of an implementation - that such a unit runs only during shutdown, and
-# that the units run in trunk order - and no init reliably offers the second:
+# A `shutdown` unit runs once, on the way down, after every other unit has stopped. That asks
+# two things of an implementation - that such a unit runs only during shutdown, and that the
+# shutdown units run in the order their `requires` say - and no init reliably offers the second:
 #
 #   finit  `run` stanzas are ordered against other commands, not against the power-off, so the
 #          sequence could be outrun entirely and the machine go down before it executed.
-#   dinit  the inverted depends-on chain is correct on paper and not honoured during a full
+#   dinit  an inverted depends-on chain is correct on paper and not honoured during a full
 #          shutdown; the later step ran first.
 #   runit  no dependency mechanism and no runlevels at all.
 #   s6-rc  the bundle comes up at boot, so the timing is wrong even where the order is right.
 #
-# So ordering is not asked of the init. The whole shutdown side is lowered here into a single
-# script, in trunk order, and each implementation hands that one script to the single point it
-# does reach reliably on the way down - `HOOK_SHUTDOWN` on finit, the latch's `stop-command` on
-# dinit, stage 3 on runit, `rc.shutdown` on s6. Ordering becomes the shell's job, which is a
-# guarantee that does hold.
+# So ordering is not asked of the init. The shutdown units are lowered here into a single
+# script, in dependency order, and each implementation hands that one script to the single
+# point it does reach reliably on the way down - `HOOK_SHUTDOWN` on finit, a latch's
+# `stop-command` on dinit, stage 3 on runit, `rc.shutdown` on s6. Ordering becomes the shell's
+# job, which is a guarantee that does hold.
 #
-# The other half is the implementation's own: a unit on this side must be kept out of whatever
-# starts at boot.
+# The other half is the implementation's own: a shutdown unit is not a process to supervise, so
+# it is never emitted as one. It exists only as a step in this script.
 { pkgs, lib }:
 rec {
-  indexOf =
-    trunk: name:
-    lib.findFirst (i: i != null) null (lib.imap0 (i: l: if l == name then i else null) trunk.levels);
+  isShutdown = unit: unit.type ? shutdown;
 
-  # which trunk level a unit belongs to: itself if it is one, otherwise the one it attached to.
-  # attaching to more than one is refused by the contract, so the first match is the only match.
-  levelFor =
-    trunk: name: unit:
-    if lib.elem name trunk.levels then
-      name
-    else
-      lib.findFirst (dep: lib.elem dep trunk.levels) null unit.requires;
+  # the units an implementation emits and supervises: everything enabled which is not a step
+  # in the shutdown script
+  bootSideOf = units: lib.filterAttrs (_: u: u.enable && !(isShutdown u)) units;
 
-  onShutdownSide =
-    trunk: name: unit:
-    let
-      latchIndex = indexOf trunk trunk.latch;
-      level = levelFor trunk name unit;
-    in
-    latchIndex != null && level != null && indexOf trunk level >= latchIndex;
-
-  # where a unit sits in the trunk, as a number. This orders the steps of the script below; no
-  # init ever sees it. A level sorts before the units attached to it, so a unit attached to a
-  # later level runs after everything attached to an earlier one.
-  priorityFor =
-    trunk: name: unit:
-    let
-      i = indexOf trunk (levelFor trunk name unit);
-    in
-    if lib.elem name trunk.levels then i * 100 else i * 100 + 50;
-
-  # the shutdown-side units of a configuration, in the order they must run
+  # the shutdown units of a configuration, in the order they must run.
+  #
+  # A topological sort over their `requires`, which the contract restricts to other shutdown
+  # units. Ties are broken by name - the input is `attrNames`, which is sorted, and the sort is
+  # stable - so the script is the same from one evaluation to the next. A cycle cannot reach
+  # here: the contract refuses one across the whole graph.
   orderedFor =
     cfg:
     let
-      enabled = lib.filterAttrs (_: u: u.enable) cfg.units;
+      steps = lib.filterAttrs (_: u: u.enable && isShutdown u) cfg.units;
+      named = lib.mapAttrsToList (name: unit: unit // { inherit name; }) steps;
+      sorted = lib.toposort (a: b: lib.elem a.name b.requires) named;
     in
-    lib.sort (a: b: a.priority < b.priority) (
-      lib.mapAttrsToList (
-        name: unit:
-        unit
-        // {
-          inherit name;
-          priority = priorityFor cfg.trunk name unit;
-        }
-      ) (lib.filterAttrs (onShutdownSide cfg.trunk) enabled)
-    );
+    sorted.result or (throw "providers.services: the shutdown units form a cycle");
 
   # `setpriv` rather than `su`: it becomes the user and their groups and execs, with no PAM
   # session, no login shell and no password database lookup beyond resolving the name. A
@@ -89,18 +59,17 @@ rec {
       + lib.optionalString (unit.group != null) " --regid ${unit.group}"
       + " --init-groups -- ";
 
-  # null when a configuration has no shutdown-side unit with anything to run
+  # each step's environment and PATH, the same as a boot-side unit is given them
+  stepEnvironment =
+    unit:
+    lib.optionalString (unit.path != [ ]) "PATH=${lib.makeBinPath unit.path}:$PATH "
+    + lib.concatStrings (lib.mapAttrsToList (k: v: "${k}=${lib.escapeShellArg v} ") unit.environment);
+
+  # null when a configuration has no shutdown units
   scriptFor =
     cfg:
     let
-      commandOf =
-        unit:
-        let
-          kind = lib.head (lib.attrNames unit.type);
-        in
-        unit.type.${kind}.command or null;
-
-      steps = lib.filter (u: commandOf u != null) (orderedFor cfg);
+      steps = orderedFor cfg;
     in
     if steps == [ ] then
       null
@@ -108,7 +77,7 @@ rec {
       pkgs.writeShellScript "providers-services-shutdown" (
         lib.concatMapStringsSep "\n" (unit: ''
           echo "shutdown: ${unit.name}" > /dev/kmsg 2>/dev/null || true
-          ${asUser unit}${commandOf unit}
+          ${stepEnvironment unit}${asUser unit}${unit.type.shutdown.command}
         '') steps
       );
 }

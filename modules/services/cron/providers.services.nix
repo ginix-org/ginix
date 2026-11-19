@@ -16,11 +16,11 @@ in
   config = lib.mkIf cfg.enable {
     providers.services.units.cron = {
       description = "cron daemon";
-      requires = [ "basic" ];
+      requires = [ "tmpfiles-setup" ] ++ config.providers.services.lib.present [ "syslogd" ];
 
       # read from a fixed path and named nowhere else, so a changed configuration
       # would otherwise leave the daemon running with the old one
-      reloadTriggers = [ cfg.crontabFile ];
+      type.service.reloadTriggers = [ cfg.crontabFile ];
 
       type.service = {
         # `-n` is foreground, so ready-on-fork is the only honest answer - see atd for why

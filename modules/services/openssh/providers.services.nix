@@ -17,8 +17,8 @@ in
     providers.services.units.ssh-keygen = {
       description = "generate ssh host keys";
 
-      # before anything can serve with them, and before the tier which completes `basic`
-      requires = [ "sysinit" ];
+      # before anything can serve with them, and after the filesystem they are kept on
+      requires = [ "tmpfiles-setup" ];
 
       # Generated beside the path and then written into it, rather than generated at it.
       #
@@ -31,8 +31,8 @@ in
       #
       # on a stdin nothing is attached to, reads EOF, and exits 1. Silently, as far as the
       # console is concerned: the task is simply `done (status=1)`, its readiness companion waits
-      # for a success which will not come, and `sysinit` never completes. The machine stops with
-      # the whole trunk behind it and nothing saying why.
+      # for a success which will not come, and nothing after it starts. The machine stops with
+      # most of the boot behind it and nothing saying why.
       #
       # And clearing the path first does not fix it, because the path is not always the machine's
       # to unlink: a machine which preserves its host key across reboots has that file bind
@@ -74,13 +74,16 @@ in
     providers.services.units.sshd = {
       description = "openssh daemon";
 
-      # `basic`, where the rest of the network daemons are. `net/lo/up` and
-      # `service/syslogd/ready` are both behind it - loopback and the logger come up in the
-      # tier which completes `basic` - so only the keys still need naming, and they are named
-      # because a daemon serving before they exist offers a host identity it then changes.
+      # the keys, because a daemon serving before they exist offers a host identity it then
+      # changes; the logger, which is what `service/syslogd/ready` said; and the firewall where
+      # there is one, since this is the machine listening.
       requires = [
-        "basic"
+        "tmpfiles-setup"
         "ssh-keygen"
+      ]
+      ++ config.providers.services.lib.present [
+        "syslogd"
+        "nftables"
       ];
 
       type.service = {

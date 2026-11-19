@@ -20,8 +20,6 @@ in
     providers.services.units.mdevd = {
       description = "device event daemon (mdevd)";
 
-      requires = [ (lib.head config.providers.services.trunk.levels) ];
-
       type.service = {
         command =
           "${cfg.package}/bin/mdevd -F /run/current-system/firmware -f ${cfg.mdevConf}"
@@ -48,16 +46,15 @@ in
       # script, which sets its own.
     };
 
-    providers.services.units.coldplug = {
+    # the coldplug, which for mdevd is also the settle: `mdevd-coldplug` returns once every
+    # device present at boot has been through the rules, so this is "enumeration is finished".
+    #
+    # `devices-settled` is the name every device manager gives that, so a consumer names the
+    # one thing whichever of them is enabled - and, like the others, nothing waits for it unless
+    # it says so. It reports to its supervisor, so it wants no logging of its own.
+    providers.services.units.devices-settled = {
       description = "cold plugging system";
-
-      # attached to the head of the trunk as well as to mdevd, so `sysinit` waits for the
-      # device nodes to be there and later tiers need not name this. mdevd-coldplug reports to
-      # its supervisor, so it wants no logging of its own.
-      requires = [
-        (lib.head config.providers.services.trunk.levels)
-        "mdevd"
-      ];
+      requires = [ "mdevd" ];
       type.oneshot.command = "${cfg.package}/bin/mdevd-coldplug" + lib.optionalString cfg.debug " -v 3";
     };
   };

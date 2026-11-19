@@ -52,7 +52,7 @@ in
       # "ap" mode and cleared its address roughly once a second - the address was re-added, and
       # removed again, so dnsmasq could not bind its DHCP socket and the station associated and
       # then deauthenticated thirty seconds later with no lease. Only the command is replaced,
-      # so the generated main.conf, the resolvconf on its path and its place in the trunk are
+      # so the generated main.conf, the resolvconf on its path and its place in the graph are
       # still the module's.
       providers.services.units.iwd.type.service.command = lib.mkForce (
         pkgs.writeShellScript "iwd" ''
@@ -70,7 +70,7 @@ in
       # the access point the machine will talk to, on its own radio
       providers.services.units.access-point = {
         description = "an access point on the second radio";
-        requires = [ "basic" ];
+        requires = [ "tmpfiles-setup" ];
 
         type.service.command = pkgs.writeShellScript "access-point" ''
           export PATH=${
@@ -138,7 +138,7 @@ in
                 }:$PATH
 
                 # bounded: a check which never returns stalls everything behind it until the
-                # start timeout, and a failing DHCP is a better failure than a stalled trunk.
+                # start timeout, and a failing DHCP is a better failure than a stalled boot.
                 n=0
                 until ip -4 addr show wlan1 2>/dev/null | grep -q "10\.9\.9\.1/24"; do
                   n=$((n + 1))
@@ -168,7 +168,7 @@ in
         '';
       };
 
-      providers.services.units.booted = coreLib.bootedUnit;
+      providers.services.units.booted = coreLib.bootedUnit config.providers.services.units;
       providers.services.tmpfiles.rules = [
         {
           path = coreLib.markerDir;

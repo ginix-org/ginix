@@ -14,10 +14,9 @@
     providers.services.units.remount-nix-store = {
       description = "remount the nix store in read only mode";
 
-      # the head of the trunk, which is `runlevels = "S"` in the contract's vocabulary: the
-      # store is mounted by the initrd, so this only has to be before anything which might
-      # write to it
-      requires = [ (lib.head config.providers.services.trunk.levels) ];
+      # requires nothing, which is `runlevels = "S"` in the contract's vocabulary: the store is
+      # mounted by the initrd, so this only has to be before anything which might write to it,
+      # and starting with the boot is before everything which does not name it.
 
       type.oneshot.command = pkgs.writeShellScript "remount-nix-store" ''
         export PATH=${
@@ -53,7 +52,7 @@
           # store which cannot be bind-mounted read-only, which is any store on a filesystem
           # that will not take one, is a machine that should come up and say so. As a finit
           # task this was the behaviour by default, because nothing waited on a task; as a
-          # unit everything above it in the trunk does, so the whole boot stopped here.
+          # unit whatever requires it does, so the boot stopped here.
           if ! mount --bind /nix/store /nix/store || ! mount -o remount,ro,bind /nix/store; then
             echo "remount-nix-store: could not make /nix/store read-only; continuing" >&2
           fi

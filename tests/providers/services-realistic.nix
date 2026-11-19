@@ -36,6 +36,10 @@
     {
       imports = [ ../lib/contract-base.nix ];
 
+      # finit's own `initctl`, whose JSON this test reads, rather than the front-end over every
+      # implementation which would otherwise be installed in front of it
+      providers.services.ctl.enable = false;
+
       environment.systemPackages = [
         pg
         pkgs.curl
@@ -53,7 +57,7 @@
         # ---- sysinit: state that everything later assumes exists ----
         state-dirs = {
           description = "create service state directories";
-          requires = [ "start" ];
+          requires = [ ];
           type.oneshot.command = script "state-dirs" ''
             mkdir -p /var/lib/postgresql ${dataDir} ${sock} /var/www /run/svc-test
             chmod 1777 /run/svc-test
@@ -66,7 +70,7 @@
         # ---- basic: database bring-up, as a real multi-step chain ----
         pg-init = {
           description = "initialise the postgres cluster";
-          requires = [ "sysinit" ];
+          requires = [ "tmpfiles-setup" ];
           user = "postgres";
           environment.HOME = dataDir;
           type.oneshot.command = script "pg-init" ''
@@ -86,7 +90,7 @@
           # finit calls it ready the moment it execs, long before it accepts connections.
           # that lie is what `pg-ready` below exists to correct.
           type.service.readiness = "fork";
-          stopTimeout = 120;
+          type.service.stopTimeout = 120;
           type.service.command = "${lib.getExe' pg "postgres"} -D ${dataDir} -k ${sock}";
         };
 
@@ -122,35 +126,17 @@
           '';
         };
 
-        # ---- multi-user: userspace which depends on things brought up before it ----
+        # ---- userspace which depends on things brought up before it ----
         web = {
           description = "web server";
-          # one trunk level, plus a direct edge to work which is not attached to any level
+          # its directories, and the one thing it actually needs: a database with a schema in it
           requires = [
-            "multi-user"
+            "tmpfiles-setup"
             "db-setup"
           ];
           type.service.command = script "web" ''
             touch /run/svc-test/web.started
             exec ${pkgs.busybox}/bin/busybox httpd -f -p 8080 -h /var/www
-          '';
-        };
-
-        # records whether the database happened to be up when `multi-user` was reached. it
-        # generally will not be: a level waits for the units attached to the previous level,
-        # not for what chains off them, so the database subsystem runs past it. that is the
-        # intended behaviour rather than a gap - a level is somewhere to attach, and anything
-        # which actually needs the database says so directly, as `web` does below.
-        mu-probe = {
-          description = "probe database state at multi-user";
-          requires = [ "multi-user" ];
-          user = "postgres";
-          type.oneshot.command = script "mu-probe" ''
-            if ${lib.getExe' pg "pg_isready"} -q -h ${sock}; then
-              touch /run/svc-test/mu-db-ready
-            else
-              touch /run/svc-test/mu-db-not-ready
-            fi
           '';
         };
       };
@@ -192,19 +178,8 @@
     with subtest("every unit reached a terminal good state"):
         for svc in ["postgres", "web"]:
             assert status(svc) == "running", f"{svc} is {status(svc)}"
-        for task in ["state-dirs", "pg-init", "pg-ready", "db-setup", "mu-probe"]:
+        for task in ["state-dirs", "pg-init", "pg-ready", "db-setup"]:
             assert status(task) == "done", f"{task} is {status(task)}"
-
-    with subtest("a level is an attachment point, not a barrier"):
-        machine.succeed("test -f /run/finit/cond/task/multi-user/success")
-
-        # informational: `multi-user` is reached without waiting for the database subsystem,
-        # because only `pg-init` is attached to a level. units needing the database say so
-        # directly instead - which is what `web` does, and why it started correctly anyway.
-        ready = machine.succeed(
-            "test -f /run/svc-test/mu-db-ready && echo ready || echo not-ready"
-        ).strip()
-        print(f"database state when multi-user was reached: {ready}")
 
     machine.shutdown()
   '';

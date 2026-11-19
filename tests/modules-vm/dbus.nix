@@ -51,7 +51,7 @@ in
         ''
       );
 
-      providers.services.units.booted = coreLib.bootedUnit;
+      providers.services.units.booted = coreLib.bootedUnit config.providers.services.units;
 
       # `mkMerge` of two definitions rather than one list: a priority wrapper applies to a whole
       # definition, so `[ … ] ++ lib.mkOrder 600 [ … ]` is not a list at all - it evaluates to
@@ -87,14 +87,16 @@ in
     machine.start()
 
     with subtest("userspace comes up and the bus is answering"):
-        machine.wait_until_succeeds("test -e ${coreLib.bootedMarker}", timeout=90)
+        # the marker waits for every unit on the machine, and under emulation - a builder without
+        # /dev/kvm - ninety seconds was enough most of the time and not always
+        machine.wait_until_succeeds("test -e ${coreLib.bootedMarker}", timeout=300)
         machine.succeed("test -S /run/dbus/system_bus_socket")
 
     with subtest("and it never failed to bind on the way there"):
         # the assertion that matters, and the one the obvious version of this test does not
-        # make. dbus attaches to the head of the trunk, and so does the unit which creates
-        # /run/dbus - so the bus used to race it, die on this message, and be restarted until
-        # the directory existed. Both checks above passed throughout: a supervisor which
+        # make. dbus once sat beside the unit which creates /run/dbus - so the bus used to race
+        # it, die on this message, and be restarted until the directory existed. Both checks
+        # above passed throughout: a supervisor which
         # restarts a service turns an ordering bug into a slow boot and nothing else.
         #
         # Timing cannot substitute for this. A restarted dbus is still older than the boot

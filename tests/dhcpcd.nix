@@ -16,15 +16,28 @@
       providers.services.backend = "finit";
       services.getty.enable = true;
 
-      # TODO: write a dnsmasq service
-      finit.services.dnsmasq = {
+      # a contract unit rather than a finit stanza: the contract's initctl, which the test
+      # script asks, only knows units declared through it.
+      #
+      # ifupdown-ng is what brings eth0 up with its static address, so it stands in for the
+      # finit-only `net/eth0/up` condition: --bind-interfaces needs the interface there to bind.
+      providers.services.units.dnsmasq = {
         description = "dhcp server";
-        command = "${pkgs.dnsmasq}/bin/dnsmasq --no-daemon --dhcp-range=192.168.1.100,192.168.1.200,255.255.255.0,1h --interface=eth0 --bind-interfaces --no-resolv --no-hosts";
-        conditions = [
-          "service/syslogd/running"
-          "net/eth0/up"
+        requires = [
+          "tmpfiles-setup"
+          "syslogd"
+          "ifupdown-ng"
         ];
+        type.service.command = "${pkgs.dnsmasq}/bin/dnsmasq --keep-in-foreground --dhcp-range=192.168.1.100,192.168.1.200,255.255.255.0,1h --interface=eth0 --bind-interfaces --no-resolv --no-hosts";
       };
+
+      # dnsmasq's default lease file directory, which nothing else creates off finit
+      providers.services.tmpfiles.rules = [
+        {
+          path = "/var/lib/misc";
+          type = "directory";
+        }
+      ];
     };
 
   nodes.client =

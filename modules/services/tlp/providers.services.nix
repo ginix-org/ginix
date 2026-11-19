@@ -20,8 +20,8 @@ in
       description = "tlp system startup";
 
       # early, like the runlevel S this used to sit in: the power policy should be in place
-      # before the machine has much running to spend power on
-      requires = [ "sysinit" ];
+      # before the machine has much running to spend power on. Its state is all it needs.
+      requires = [ "tmpfiles-setup" ];
 
       # three finit stanzas reduce to this one. `tlp@reload` ran `tlp start` and existed only
       # so that a changed tlp.conf would be applied - which the stanza arranged by mentioning
@@ -58,11 +58,9 @@ in
     providers.services.units.tlp-stop = {
       description = "tlp system shutdown";
 
-      # `runlevels = "06"` was finit's way of saying "on the way down", and the shutdown side
-      # of the trunk is what means that on every implementation
-      requires = [ "stopped" ];
-
-      type.oneshot.command = "${tlpExe} init stop";
+      # `runlevels = "06"` was finit's way of saying "on the way down", which is what a shutdown
+      # unit means on every implementation
+      type.shutdown.command = "${tlpExe} init stop";
     };
 
     providers.services.tmpfiles.rules = [

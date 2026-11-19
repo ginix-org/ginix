@@ -17,10 +17,13 @@ in
     providers.services.units.powertop = {
       description = "powertop tunings";
 
-      # `after multi-user.target` on nixos. Tuning is something done to a
-      # running system rather than something the system waits on, and nothing
-      # else requires this unit.
-      requires = [ "multi-user" ];
+      # `after multi-user.target` on nixos. Tuning is something done to the devices a machine
+      # has, so it waits for the device manager to have enumerated them; nothing else requires
+      # this unit.
+      requires = config.providers.services.lib.present [
+        "syslogd"
+        "devices-settled"
+      ];
 
       # A oneshot's only knob is its command, so nixos' preStart and postStart
       # have no equivalent here: a machine wanting either writes a script and

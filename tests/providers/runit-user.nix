@@ -68,7 +68,7 @@
           ${pkgs.coreutils}/bin/mkdir -p /run/svc-test
           ${pkgs.coreutils}/bin/chmod 1777 /run/svc-test
         '';
-        requires = [ "sysinit" ];
+        requires = [ "tmpfiles-setup" ];
       };
 
       # the substitution the launcher does, which is not a shell's. BASE is plain; the three
@@ -91,10 +91,6 @@
       providers.services.users.alice.units = {
         agent = {
           type.service.command = daemon "alice-agent" "123456";
-
-          # `requires` defaults to the first trunk level, which is a system unit - so a user unit
-          # has to opt out of it explicitly. Same note as in services-users-split.nix.
-          requires = [ ];
         };
 
         # an edge inside her own tree, which on this backend is a latch file under her own

@@ -34,13 +34,14 @@ rec {
 
   # everything Nix resolves, as one file.
   #
-  # `requires` is already flattened - every trunk edge and every explicit `requires` - so nothing
+  # `requires` is already exactly the edges, as written - so nothing
   # at boot searches or orders anything. That is the property the measurement which chose these
   # backends depends on, and moving from generated shell to generated JSON does not touch it.
   manifestFor =
     cfg:
     let
-      enabled = lib.filterAttrs (_: u: u.enable) cfg.units;
+      # a shutdown unit has no job: it is a step in `shutdown_command`, and nothing else
+      enabled = shutdownLib.bootSideOf cfg.units;
 
       unitJson =
         name: unit:
@@ -52,7 +53,7 @@ rec {
           fingerprint = cfg.switch.fingerprints.${name};
           requires = unit.requires;
           inherit kind;
-          command = v.command or null;
+          inherit (v) command;
           user = unit.user;
           group = unit.group;
 
@@ -67,8 +68,6 @@ rec {
           # null means `fork` readiness - up the moment it is running. `notify` and `s6` never
           # reach here; the contract refuses them against these backends.
           readiness_command = if kind == "service" then readinessLib.scriptFor name v.readiness else null;
-
-          shutdown_side = shutdownLib.onShutdownSide cfg.trunk name unit;
         };
     in
     pkgs.writeText "finix-rc-manifest.json" (

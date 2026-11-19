@@ -8,9 +8,9 @@
 #      retracts, finit cannot express a dependency which gates starting without also
 #      propagating stops, and the encoding has to change.
 #
-#   2. does finit run the shutdown-side `[06]` stanzas after tearing the boot-side
-#      services down, or concurrently with it? the trunk's latch level is named
-#      `stopped`, and that name is only honest if teardown has finished by then.
+#   2. does finit run the shutdown units after tearing the boot-side services down, or
+#      concurrently with it? a shutdown unit is promised that everything else has stopped,
+#      and that is only honest if teardown has finished by then.
 {
   name = "providers.services";
 
@@ -22,6 +22,7 @@
       daemon =
         name:
         pkgs.writeShellScript "${name}-daemon" ''
+          export PATH=${pkgs.coreutils}/bin:$PATH
           mkdir -p /run/svc-test
           trap 'rm -f /run/svc-test/${name}.running; exit 0' TERM
           touch /run/svc-test/${name}.running
@@ -33,6 +34,7 @@
       marker =
         name:
         pkgs.writeShellScript "${name}-marker" ''
+          export PATH=${pkgs.coreutils}/bin:$PATH
           mkdir -p /run/svc-test
           echo "${name} ran" > /run/svc-test/${name}.ran
         '';
@@ -40,19 +42,23 @@
     {
       imports = [ ../lib/contract-base.nix ];
 
+      # finit's own `initctl`, whose JSON this test reads, rather than the front-end over every
+      # implementation which would otherwise be installed in front of it
+      providers.services.ctl.enable = false;
+
       providers.services.units = {
-        # attaches to the first trunk level, so `sysinit` cannot be reached until it is done
+        # requires nothing, so it runs as soon as the boot does
         early = {
           type.oneshot.command = marker "early";
-          requires = [ "start" ];
+          requires = [ ];
         };
 
         alpha = {
           type.service.command = daemon "alpha";
-          requires = [ "sysinit" ];
+          requires = [ "tmpfiles-setup" ];
         };
 
-        # depends on a service rather than a level, so it exercises the companion latch
+        # depends on a service, so it exercises the companion latch
         beta = {
           type.service.command = daemon "beta";
           requires = [ "alpha" ];
@@ -60,21 +66,20 @@
 
         gamma = {
           type.service.command = daemon "gamma";
-          requires = [ "basic" ];
+          requires = [ "tmpfiles-setup" ];
         };
 
         # left running for the shutdown test, so its marker file is still there when the
-        # shutdown-side units run
+        # shutdown units run
         delta = {
           type.service.command = daemon "delta";
-          requires = [ "sysinit" ];
+          requires = [ "tmpfiles-setup" ];
         };
 
-        # shutdown side: attaches to a level after the latch, and reports both that it ran
-        # at all and whether the boot-side services were gone by the time it did
+        # a shutdown unit, which reports both that it ran at all and whether the boot-side
+        # services were gone by the time it did
         late = {
-          requires = [ "stopped" ];
-          type.oneshot.command = pkgs.writeShellScript "late" ''
+          type.shutdown.command = pkgs.writeShellScript "late" ''
             if [ -e /run/svc-test/delta.running ]; then
               echo "SHUTDOWN-STEP late RACE delta still running" > /dev/console
             else
@@ -83,11 +88,11 @@
           '';
         };
 
-        # a second step after `late`, to prove the shutdown sequence runs to its end rather
+        # a second step, requiring `late`, to prove the shutdown sequence runs to its end rather
         # than being cut off partway by the power going down
         later = {
-          requires = [ "stopped" ];
-          type.oneshot.command = pkgs.writeShellScript "later" ''
+          requires = [ "late" ];
+          type.shutdown.command = pkgs.writeShellScript "later" ''
             echo "SHUTDOWN-STEP later" > /dev/console
           '';
         };
@@ -120,7 +125,7 @@
     machine.wait_for_console_text("finix - stage 1")
     machine.wait_for_console_text("finix - stage 2")
     machine.wait_for_console_text("entering runlevel 2")
-    # and then the trunk itself, rather than the terminal.
+    # and then the units under test, rather than the terminal.
     #
     # This waited for `getty on /dev/tty1` - the tty unit's description, which finit used to
     # print through its progress display. It does not any more: the display is turned off the
@@ -130,24 +135,18 @@
     #
     # `Starting tty-tty1` is the line finit does print, and waiting for that would still be
     # wrong: these tests attach the terminal to nothing (`requires = [ ]`), so a prompt exists
-    # well before the levels below it are reached, and the assertions here would run against a
-    # trunk which is still coming up. So wait for the top of the trunk, which is what they are
-    # about.
-    machine.wait_until_succeeds("test -f /run/finit/cond/task/running/success", timeout=120)
+    # well before the units below are up, and the assertions here would run against a graph
+    # which is still coming up. So wait for every unit they are about to have latched.
+    for unit in ["early", "alpha", "beta", "gamma", "delta"]:
+        machine.wait_until_succeeds(
+            f"test -f /run/finit/cond/task/{unit}-started/success", timeout=120
+        )
 
-
-    with subtest("trunk levels are reached in order"):
-        for level in ["start", "sysinit", "basic", "multi-user", "running"]:
-            machine.succeed(f"test -f /run/finit/cond/task/{level}/success")
-            assert cond(f"task/{level}/success") == "on", f"{level} not reached"
-
-    with subtest("the latch does not resolve while the system is running"):
-        # `stopped` and `shutdown` exist only in runlevels 0 and 6
-        machine.fail("test -f /run/finit/cond/task/stopped/success")
-        machine.fail("test -f /run/finit/cond/task/shutdown/success")
+    with subtest("the shutdown units do not run while the system is up"):
+        # a shutdown unit is a step in a script, not a stanza, and has not run
         machine.fail("test -f /run/svc-test/late.ran")
 
-    with subtest("units attached to the trunk all started"):
+    with subtest("the units all started"):
         machine.succeed("test -f /run/svc-test/early.ran")
         for svc in ["alpha", "beta", "gamma", "delta"]:
             assert status(svc) == "running", f"{svc} is {status(svc)}"
@@ -156,12 +155,12 @@
         for svc in ["alpha", "beta", "gamma", "delta"]:
             assert cond(f"task/{svc}-started/success") == "on"
 
-    with subtest("anchors have companions too, so restarting one cannot cascade"):
+    with subtest("oneshots have companions too, so restarting one cannot cascade"):
         # a unit depended upon directly would drop its condition when restarted, taking down
-        # everything hanging off it. the switch engine restarts an anchor whenever a service
-        # attaches to its trunk level, so anchors need the latch as much as services do.
-        for level in ["start", "sysinit", "basic", "multi-user", "running"]:
-            assert cond(f"task/{level}-started/success") == "on", f"{level} has no companion"
+        # everything hanging off it. a switch restarts a oneshot whose definition changed, so
+        # oneshots need the latch as much as services do.
+        for unit in ["early"]:
+            assert cond(f"task/{unit}-started/success") == "on", f"{unit} has no companion"
 
     # question 1: does the companion latch survive its own condition being lost?
 

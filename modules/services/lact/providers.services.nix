@@ -17,8 +17,9 @@ in
     providers.services.units.lactd = {
       description = "LACT GPU control daemon";
 
-      # `After=multi-user.target` in the unit lact ships.
-      requires = [ "multi-user" ];
+      # `After=multi-user.target` in the unit lact ships, which here is what it actually uses:
+      # its state and the logger.
+      requires = [ "tmpfiles-setup" ] ++ config.providers.services.lib.present [ "syslogd" ];
 
       # `Nice=-10` in that unit, which the contract has no word for, so it is
       # said to the process instead. A GPU control daemon losing the CPU is a
@@ -31,7 +32,7 @@ in
       # The daemon reads this from a fixed path, so without naming it here the
       # file could change while the unit stayed identical and lactd kept running
       # with what it started with.
-      reloadTriggers = lib.optional (
+      type.service.reloadTriggers = lib.optional (
         cfg.settings != { }
       ) config.environment.etc."lact/config.yaml".source;
     };

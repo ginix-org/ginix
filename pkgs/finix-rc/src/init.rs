@@ -9,7 +9,7 @@
 //! in the first place. Threads here would have made the running generation something only
 //! rc.init could reach into, which is the supervisor this backend is trying not to have.
 //!
-//! Once every job is launched there is nothing left to do but reap. An anchor's or oneshot's job
+//! Once every job is launched there is nothing left to do but reap. A oneshot's job
 //! exits as soon as it has latched, and would otherwise zombie under rc.init specifically, since
 //! it is rc.init - not pid 1 - that is its parent for as long as rc.init keeps running.
 
@@ -35,7 +35,9 @@ pub fn run(manifest: &Manifest, manifest_path: &str) -> ExitCode {
         return ExitCode::from(1);
     };
 
-    for (name, _) in manifest.boot_side() {
+    // every unit in the manifest has a job: the shutdown units are not in it, being steps in
+    // `shutdown_command` rather than anything to start
+    for name in manifest.units.keys() {
         let spawned = Command::new(&exe)
             .arg("job")
             .arg(manifest_path)
@@ -51,8 +53,8 @@ pub fn run(manifest: &Manifest, manifest_path: &str) -> ExitCode {
     // them at once: a service's job never exits on its own, so there is no point at which they
     // could all be collected.
     //
-    // `reap_one` returning false means there are no children left - every job was a oneshot or
-    // an anchor and all of them are done. There is nothing further to do and this still must not
+    // `reap_one` returning false means there are no children left - every job was a oneshot
+    // and all of them are done. There is nothing further to do and this still must not
     // return, so it sleeps instead of spinning on an error.
     loop {
         if !proc::reap_one() {

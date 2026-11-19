@@ -6,9 +6,9 @@
 # that is a judgement, and it is made by looking at one.
 #
 # So what is asserted here is the part which is not a judgement: that every shape the chart has
-# a rule for appears when the configuration calls for it, that a unit's attachment is drawn once
-# rather than twice, and that the two claims the chart makes on its own - "nothing waits for
-# this unit" and "the shutdown side hangs off nothing" - are made only when they are true.
+# a rule for appears when the configuration calls for it, that an edge is drawn as declared, and
+# that the one claim the chart makes on its own - "this unit starts with the boot, waiting for
+# nothing" - is made only when it is true.
 {
   lib,
   pkgs,
@@ -23,36 +23,32 @@ let
       services.mdevd.enable = true;
 
       providers.services.units = {
-        # an ordinary daemon on a level, which is what most units are
+        # an ordinary daemon, behind the unit which puts its state in place
         demo = {
           description = "a demonstration daemon";
-          requires = [ "basic" ];
+          requires = [ "tmpfiles-setup" ];
           type.service.command = "/bin/demo";
         };
 
-        # attached to the same level and also behind the daemon, which is the edge the chart
-        # draws inside a tier. Both facts are true at once and the picture has to hold both:
-        # it starts in that tier, and not before `demo` is up.
+        # behind the daemon as well, so the chart has an edge between two units of the
+        # configuration's own
         after-demo = {
           requires = [
-            "basic"
+            "tmpfiles-setup"
             "demo"
           ];
           type.oneshot.command = "/bin/after-demo";
         };
 
-        # named no level at all. It runs when `demo` is up and never otherwise, but no level
-        # waits for it, so nothing attached to a later level is ordered against it - the thing
-        # the chart puts in its own box and its own colour.
-        floats = {
-          requires = [ "demo" ];
-          type.oneshot.command = "/bin/floats";
+        # requires nothing, so it starts with the boot - which the chart outlines. Named to sort
+        # first, so the line listing the roots begins with it and can be matched exactly.
+        aaa-early = {
+          type.oneshot.command = "/bin/early";
         };
 
         # and one on the way down
         on-the-way-out = {
-          requires = [ "stopped" ];
-          type.oneshot.command = "/bin/out";
+          type.shutdown.command = "/bin/out";
         };
       };
     };
@@ -67,12 +63,8 @@ let
     {
       # double-quoted, because a single-line `''…''` has its indentation stripped and the
       # indentation is part of what is being asserted
-      line = "  u_basic --> u_demo";
-      why = "a unit attached to a level hangs off that level, which is the edge it declared";
-    }
-    {
-      line = "  u_demo --> u_multi_user";
-      why = "and the next level hangs off the unit, which is what waiting for a tier is made of";
+      line = "  u_tmpfiles_setup --> u_demo";
+      why = "a unit hangs off what it requires, which is the edge it declared";
     }
     {
       line = "  u_demo(\"demo<br/>service · fork\"):::service";
@@ -84,19 +76,15 @@ let
     }
     {
       line = "  u_demo --> u_after_demo";
-      why = "an edge between two units on the same level is drawn like any other";
+      why = "an edge between two of the configuration's own units is drawn like any other";
     }
     {
-      line = "  u_floats[\"floats<br/>oneshot\"]:::floating";
-      why = "a unit which named no level is coloured for it, since no level waits for it";
+      line = "  u_on_the_way_out[/\"on-the-way-out<br/>shutdown\"\\]:::shutdown";
+      why = "a shutdown unit is drawn as one";
     }
     {
-      line = "  u_stopped{{\"stopped<br/>level · latch\"}}:::level";
-      why = "the latch says so, because the graph falls in two there and that is not a mistake";
-    }
-    {
-      line = "  u_on_the_way_out[\"on-the-way-out<br/>oneshot\"]:::oneshot";
-      why = "the shutdown side is drawn too - it is part of the configuration";
+      line = "  class u_aaa_early,";
+      why = "a unit which requires nothing is outlined, since it starts with the boot";
     }
   ];
 
@@ -106,8 +94,12 @@ let
       why = "the graph is drawn as it is - units, and the edges between them - with nothing boxed, grouped or collapsed";
     }
     {
-      line = "--> u_stopped";
-      why = "nothing leads to the latch: it means everything has stopped, which is not a fact about starting";
+      line = ",u_demo,";
+      why = "a unit which requires something is not a root";
+    }
+    {
+      line = ",u_on_the_way_out";
+      why = "a shutdown unit is not started at all, so it is not a root either";
     }
   ];
 

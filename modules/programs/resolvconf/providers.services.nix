@@ -19,7 +19,9 @@ in
 
       # early, and before anything which resolves a name: the records are written by whatever
       # configured the interface, and this is what turns them into /etc/resolv.conf
-      requires = [ "sysinit" ];
+      #
+      # `tmpfiles-setup`, because what it writes is under /run
+      requires = [ "tmpfiles-setup" ];
 
       type.oneshot.command = "${lib.getExe cfg.package} -u";
     };

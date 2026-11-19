@@ -11,8 +11,8 @@
 # modules-vm.openssh.s6-rc`, or the whole row with `-A modules-vm.openssh`.
 #
 # There is deliberately no attempt to cover every module this way. A VM per module per init is
-# 424 machines, most of which would assert nothing more than "it booted" - which the trunk
-# already guarantees, since every unit a module adds is something a trunk level waits for. The
+# 424 machines, most of which would assert nothing more than "it booted" - which modules-boot
+# already checks, since every unit a module adds is something its marker waits for. The
 # modules worth a machine are the ones whose behaviour is not implied by their unit graph: a
 # daemon which has to serve something, a protocol which has to be spoken, an ordering whose
 # failure is silent.

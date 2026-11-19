@@ -35,14 +35,13 @@ in
         ];
       };
 
-      # no runlevels: the trunk has no notion of a level a service is simply not considered
+      # no runlevels: the contract has no notion of a level a service is simply not considered
       # on, which is what `runlevels = "34"` meant here - and on a machine booting to 2 it
       # meant seatd never started, reported as "halted" rather than as anything being wrong.
       #
-      # `sysinit` puts it in the basic tier, so a seat exists before `basic` is reached and so
-      # before anything attached to it. syslogd is no longer named: it is in the head tier, and
-      # everything later is after it by the trunk rather than by each module saying so.
-      requires = [ "sysinit" ];
+      # /run, where its socket goes, and the logger. Anything which wants a seat - a greeter, a
+      # compositor - names this unit.
+      requires = [ "tmpfiles-setup" ] ++ config.providers.services.lib.present [ "syslogd" ];
     };
   };
 }

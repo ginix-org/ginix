@@ -25,22 +25,18 @@ in
         readiness = "fork";
       };
 
-      # the head of the trunk, so logging is up before `sysinit` and everything in a later
-      # tier can log without naming it. The device manager comes first where there is one:
-      # /dev/log has to exist before anything can log to it. This is the same shape as
-      # sysklogd's unit, deliberately - the two are alternatives under one name, and a
-      # machine enabling both is one definition of `syslogd` colliding with another, which
-      # is exactly the error it should be.
+      # `syslogd` whichever logger it is, so anything wanting to log from its first line names
+      # that. The device manager comes first where there is one: /dev/log has to exist before
+      # anything can log to it. This is the same shape as sysklogd's unit, deliberately - the two
+      # are alternatives under one name, and a machine enabling both is one definition of
+      # `syslogd` colliding with another, which is exactly the error it should be.
       requires = [
-        (lib.head config.providers.services.trunk.levels)
-
-        # in the same tier, so named rather than merely attached-after: /var/log is one of the
-        # base tmpfiles rules, and on a machine where it is not already on disk the logger
-        # would otherwise race the unit which creates it.
+        # /var/log is one of the base tmpfiles rules, and on a machine where it is not already on
+        # disk the logger would otherwise race the unit which creates it.
         "tmpfiles-setup"
       ]
       ++ lib.optional config.services.udev.enable "udev-coldplug"
-      ++ lib.optional config.services.mdevd.enable "coldplug"
+      ++ lib.optional config.services.mdevd.enable "devices-settled"
       ++ lib.optional config.services.gardendevd.enable "gardendevd-coldplug";
     };
   };

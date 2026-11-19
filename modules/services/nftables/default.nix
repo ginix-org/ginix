@@ -205,7 +205,7 @@ in
     environment.systemPackages = [ cfg.package ];
 
     # `post` was finit's stop action - the thing it runs when the task goes away - and the
-    # shutdown side of the trunk is what means that on every implementation
+    # `nftables-flush`, a shutdown unit, is what means that on every implementation
     # this module supplies an implementation for `providers.firewall`
     providers.firewall.backend = "nftables";
 

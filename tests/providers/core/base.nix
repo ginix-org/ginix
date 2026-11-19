@@ -9,6 +9,7 @@
   coreLib,
 }:
 {
+  config,
   lib,
   modules,
   ...
@@ -23,18 +24,17 @@
   # module emits contract units, so this is the same daemon on all four.
   services.mdevd.enable = true;
 
-  # a terminal is not a daemon - no readiness signal, and nothing ever depends on one - so it is
-  # its own provider rather than something declared directly, which is what lets this be said
-  # once for all four backends. It used to be a `finit.ttys` stanza under an `mkIf`, because a
-  # terminal was only expressible to finit.
-  services.getty.enable = false;
-  providers.ttys.devices.tty1 = {
-    description = "getty on /dev/tty1";
-
-    # nothing in these tests is waiting for the system to be up before a prompt is useful, and
-    # a test which stalls the trunk is one where a prompt is the only way to see why
-    requires = [ ];
+  # one login prompt, on tty1, said once for every backend. It used to be a `finit.ttys` stanza
+  # under an `mkIf`, because a terminal was only expressible to finit.
+  #
+  # Attached to nothing: nothing in these tests is waiting for the system to be up before a
+  # prompt is useful, and a test which stalls the boot is one where a prompt is the only way
+  # to see why.
+  services.getty = {
+    enable = true;
+    ttys = [ "tty1" ];
   };
+  providers.services.units.tty-tty1.requires = [ ];
 
   # the marker directory, made once before any unit runs rather than by each unit for itself.
   # 1777 because a unit running as somebody else writes here too, and `mkdir -p` from whichever
@@ -47,5 +47,5 @@
     }
   ];
 
-  providers.services.units.booted = coreLib.bootedUnit;
+  providers.services.units.booted = coreLib.bootedUnit config.providers.services.units;
 }

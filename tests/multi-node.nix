@@ -38,8 +38,10 @@
     server.wait_for_console_text("entering runlevel 2")
 
     # wait for network connection
-    client.wait_until_succeeds(f"initctl cond get net/eth0/running")
-    server.wait_until_succeeds(f"initctl cond get net/eth0/running")
+    # the address itself rather than finit's `net/eth0/running` condition, which the contract's
+    # initctl has no command for
+    client.wait_until_succeeds("ip -4 addr show eth0 | grep -q 'inet 192.168.1.'")
+    server.wait_until_succeeds("ip -4 addr show eth0 | grep -q 'inet 192.168.1.'")
 
     with subtest("nodes have correct ips"):
         client_ip = client.succeed("ip addr show eth0")

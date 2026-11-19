@@ -44,12 +44,12 @@
             mkdir -p /run/svc-test
             touch /run/svc-test/early.ran
           '';
-          requires = [ "start" ];
+          requires = [ ];
         };
 
         alpha = {
           type.service.command = daemon "alpha";
-          requires = [ "sysinit" ];
+          requires = [ "tmpfiles-setup" ];
         };
 
         # a dependent of a service, to show the latch a supervised unit writes is what
@@ -61,21 +61,21 @@
 
         gamma = {
           type.service.command = daemon "gamma";
-          requires = [ "basic" ];
+          requires = [ "tmpfiles-setup" ];
         };
 
-        # the shutdown side, at two trunk positions so their order is unambiguous. Reaching
-        # these at all means rcshutdown was spawned rather than reboot(2) called directly.
+        # two shutdown units, the second requiring the first so their order is unambiguous.
+        # Reaching these at all means rcshutdown was spawned rather than reboot(2) called
+        # directly.
         late = {
-          requires = [ "stopped" ];
-          type.oneshot.command = pkgs.writeShellScript "late" ''
+          type.shutdown.command = pkgs.writeShellScript "late" ''
             echo "NXINIT-SHUTDOWN-1-late" > /dev/console
           '';
         };
 
         later = {
-          requires = [ "shutdown" ];
-          type.oneshot.command = pkgs.writeShellScript "later" ''
+          requires = [ "late" ];
+          type.shutdown.command = pkgs.writeShellScript "later" ''
             echo "NXINIT-SHUTDOWN-2-later" > /dev/console
           '';
         };
@@ -96,11 +96,7 @@
         # latch means /dev/fd existed at the moment nxinit exec'd it. A failure here is the
         # `pre` op not having run, and looks like:
         #   bash: /dev/fd/3: No such file or directory
-        machine.wait_until_succeeds(ready("start"), timeout=120)
-
-    with subtest("the trunk came up in order"):
-        for level in ["start", "sysinit", "basic", "multi-user", "running"]:
-            machine.wait_until_succeeds(ready(level))
+        machine.wait_until_succeeds(ready("tmpfiles-setup"), timeout=120)
 
     with subtest("a oneshot ran and latched"):
         machine.wait_until_succeeds(ready("early"))
@@ -123,7 +119,7 @@
         machine.succeed("initctl list > /tmp/units; grep -q alpha /tmp/units")
         machine.wait_until_succeeds("initctl status alpha > /tmp/st; grep -q running /tmp/st")
 
-    with subtest("shutdown runs the shutdown side, in trunk order"):
+    with subtest("shutdown runs the shutdown units, in dependency order"):
         # `initctl poweroff` rather than `machine.shutdown()`, which asks qemu for an ACPI
         # powerdown. Nothing here listens for that: nxinit blocks CHLD, USR1 and USR2 and
         # answers nothing else, so an ACPI event reaches no one and the machine sits there

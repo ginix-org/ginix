@@ -18,7 +18,13 @@ in
       inherit (cfg) user group;
 
       description = "jellyfin media server";
-      requires = [ "basic" ];
+      requires = [
+        "tmpfiles-setup"
+      ]
+      ++ config.providers.services.lib.present [
+        "syslogd"
+        "nftables"
+      ];
 
       type.service.command = "${lib.getExe cfg.package} --datadir ${cfg.dataDir} --configdir ${cfg.dataDir}/config --cachedir /var/cache/jellyfin --logdir /var/log/jellyfin";
     };

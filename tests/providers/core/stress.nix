@@ -96,7 +96,7 @@ in
         # two branches of different depth and different timing, so neither finishing first is
         # a matter of which was declared first
         a1 = slow "a1" 2 // {
-          requires = [ "sysinit" ];
+          requires = [ "tmpfiles-setup" ];
         };
         a2 = slow "a2" 1 // {
           requires = [ "a1" ];
@@ -106,7 +106,7 @@ in
         };
 
         b1 = slow "b1" 3 // {
-          requires = [ "sysinit" ];
+          requires = [ "tmpfiles-setup" ];
         };
         b2 = slow "b2" 1 // {
           requires = [ "b1" ];
@@ -129,22 +129,26 @@ in
           requires = [ "join" ];
         };
 
-        # the shutdown side: two units on the latch level and one on the level after it. The
-        # pair are siblings, so nothing orders them against each other - but both must have
-        # finished before the next level runs, and that is what the last one reports.
+        # the shutdown units: a pair which are siblings, so nothing orders them against each
+        # other, and one requiring both - which must not run until both have finished, and
+        # reports whether they had.
+        #
+        # The last is named to sort *before* the pair, because the shutdown script breaks ties
+        # by name: in the other order the edges could be ignored and this would still pass.
         down-a1 = {
-          requires = [ "stopped" ];
-          type.oneshot.command = downStep "down-a1" 2;
+          type.shutdown.command = downStep "down-a1" 2;
         };
 
         down-a2 = {
-          requires = [ "stopped" ];
-          type.oneshot.command = downStep "down-a2" 2;
+          type.shutdown.command = downStep "down-a2" 2;
         };
 
-        down-last = {
-          requires = [ "shutdown" ];
-          type.oneshot.command = pkgs.writeShellScript "stress-down-last" ''
+        down-0-last = {
+          requires = [
+            "down-a1"
+            "down-a2"
+          ];
+          type.shutdown.command = pkgs.writeShellScript "stress-down-last" ''
             ${sleep} 1
             seen=0
             for m in down-a1 down-a2; do
@@ -192,8 +196,8 @@ in
         machine.wait_for_console_text("STRESS-DOWN down-a1")
         machine.wait_for_console_text("STRESS-DOWN down-a2")
 
-        # the claim that orders them: the later level ran only once both units attached to the
-        # earlier one had finished, and says so itself rather than leaving it to be inferred
+        # the claim that orders them: the last step ran only once both steps it requires
+        # had finished, and says so itself rather than leaving it to be inferred
         # from the order two console lines were read in
         machine.wait_for_console_text("STRESS-DOWN-LAST saw:2")
 

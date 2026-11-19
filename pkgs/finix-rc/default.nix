@@ -31,7 +31,7 @@ pkgsStatic.rustPlatform.buildRustPackage {
   stripAllList = [ "bin" ];
 
   meta = {
-    description = "jobs, the trunk, shutdown and switch for an init which has none of them";
+    description = "jobs, ordering, shutdown and switch for an init which has none of them";
     license = lib.licenses.mit;
     platforms = lib.platforms.linux;
     mainProgram = "finix-rc";

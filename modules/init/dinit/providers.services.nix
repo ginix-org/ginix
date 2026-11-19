@@ -6,21 +6,11 @@
 }:
 let
   cfg = config.providers.services;
-  trunk = cfg.trunk;
 
   # `depends-ms` is a milestone dependency - the named service must start successfully once,
   # and may stop afterwards without affecting this one - which is exactly an edge that gates
-  # starting and nothing else. the finit backend has to fake it.
-  #
-  # An anchor is a scripted unit running `true` rather than dinit.s own process-less
-  # `internal`, which it could use. An anchor means the same thing on every backend and there
-  # is no reason for it to behave differently on this one: `internal` has its own rules about
-  # stopping and restarting, and a trunk level built out of it would not be the same object as
-  # the trunk level next door. The cost is one `true` per level, at the moment it is reached.
-  type = {
-    anchor = "scripted";
-    oneshot = "scripted";
-  };
+  # starting and nothing else, which the finit backend has to fake. It is the edge every unit
+  # here is wired with.
 
   kindOf = unit: lib.head (lib.attrNames unit.type);
   variantOf = unit: unit.type.${kindOf unit};
@@ -75,10 +65,21 @@ let
 
   edgeTo = edgeIn enabled;
 
+  # a unit's start timeout as dinit takes it: the contract's number where there is one, and 0 -
+  # dinit for unlimited - where there is not, since an unset `startTimeout` is no bound at all
+  # and dinit's own default is sixty seconds. A slow `tmpfiles-setup` was cancelled by it, and
+  # everything behind it failed.
+  startTimeoutOf =
+    unit:
+    let
+      t = (variantOf unit).startTimeout or null;
+    in
+    if t == null then 0 else t;
+
   typeOf =
     unit:
-    if kindOf unit != "service" then
-      type.${kindOf unit}
+    if kindOf unit == "oneshot" then
+      "scripted"
     else if waitKindOf unit == "pidfile" then
       "bgprocess"
     else
@@ -107,81 +108,42 @@ let
     name: unit:
     if (variantOf unit) ? command then withPath name unit (variantOf unit).command else null;
 
-  indexOf =
-    name:
-    lib.findFirst (i: i != null) null (lib.imap0 (i: l: if l == name then i else null) trunk.levels);
-
-  latchIndex = indexOf trunk.latch;
-
-  levelFor =
-    name: unit:
-    if lib.elem name trunk.levels then
-      name
-    else
-      lib.findFirst (dep: lib.elem dep trunk.levels) null unit.requires;
-
-  onShutdownSide =
-    name: unit:
-    let
-      level = levelFor name unit;
-    in
-    latchIndex != null && level != null && indexOf level >= latchIndex;
-
-  priorityFor =
-    name: unit:
-    let
-      i = indexOf (levelFor name unit);
-    in
-    if lib.elem name trunk.levels then i * 100 else i * 100 + 50;
-
-  # dinit has no runlevels, so the latch cannot be a unit which simply does not exist while
-  # the system runs - anything reachable from the root service starts at boot. what it has
-  # instead is `stop-command`, and a documented intent that shutdown work belongs there.
+  # the shutdown units, as one script in dependency order.
   #
-  # so the shutdown side inverts: each post-latch unit starts as a no-op and does its real
-  # work on the way down. dinit stops dependents before their dependencies, so to make the
-  # stop order match the trunk's forward order, each unit depends on the one *after* it -
-  # the reverse of how the boot side is wired.
-  shutdownOrdered = lib.sort (a: b: a.priority < b.priority) (
-    lib.mapAttrsToList (
-      name: unit:
-      unit
-      // {
-        inherit name;
-        priority = priorityFor name unit;
-      }
-    ) (lib.filterAttrs onShutdownSide enabled)
-  );
-
-  # the whole shutdown side as one script, in trunk order.
+  # dinit has no runlevels, so a shutdown unit cannot be a service which simply does not exist
+  # while the system runs - anything reachable from the root service starts at boot. What it has
+  # instead is `stop-command`, and a documented intent that shutdown work belongs there. An
+  # inverted chain of stop-commands, one per step, was correct on paper and not honoured during
+  # a full shutdown: with two steps, dinit ran the later one's stop-command first.
   #
-  # The chain below is correct on paper - each unit depends on the one after it, so stopping
-  # dependents first walks the trunk forwards - and dinit does not honour it during a full
-  # shutdown. With `then-down` attached to a later level than `first-down`, dinit ran
-  # `then-down`'s stop-command first, and it reported that the earlier step had not run.
-  #
-  # So ordering becomes the shell's job, which is a guarantee that does hold. This is the same
-  # conclusion the finit backend reached, for the same reason.
-  #
-  # It hangs off the latch, which is the one service guaranteed to stop after the boot side:
-  # the first trunk level depends on it, so everything reachable from the root stops first.
+  # So ordering becomes the shell's job, which is a guarantee that does hold - the same
+  # conclusion the finit backend reached, for the same reason. The script is the stop-command of
+  # the latch below.
   shutdownScript = shutdownLib.scriptFor cfg;
 
-  successorOf =
-    name:
-    let
-      i = lib.findFirst (x: x != null) null (
-        lib.imap0 (x: u: if u.name == name then x else null) shutdownOrdered
-      );
-    in
-    if i != null && i + 1 < lib.length shutdownOrdered then
-      [ (lib.elemAt shutdownOrdered (i + 1)).name ]
-    else
-      [ ];
+  enabled = shutdownLib.bootSideOf cfg.units;
 
-  enabled = lib.filterAttrs (_: u: u.enable) cfg.units;
+  # the latch: a service which does nothing on the way up and is stopped after everything else
+  # on the way down, so that its stop-command runs with the system already stopped.
+  #
+  # Every root of the system graph - each unit requiring nothing - depends on it. Stop order is
+  # the reverse of start order, everything is transitively behind some root, and so everything
+  # stops before the latch does. The graph has no single head for it to hang off; its roots are
+  # the same fact, said once per root.
+  latchName = "providers-services-shutdown";
 
-  latchName = if shutdownOrdered == [ ] then null else (lib.head shutdownOrdered).name;
+  latch = {
+    type = "scripted";
+    command = true';
+
+    # the latch brackets the whole system: started first, stopped last. dinit documents
+    # kill-all-on-stop for exactly this position, so shutdown work is not obstructed by
+    # orphaned processes still holding filesystems open.
+    options = [ "kill-all-on-stop" ];
+  }
+  // lib.optionalAttrs (shutdownScript != null) {
+    stop-command = "${shutdownScript}";
+  };
 
   true' = lib.getExe' pkgs.coreutils "true";
 
@@ -200,45 +162,28 @@ let
     }
     // lib.optionalAttrs (commandOf name unit != null) { command = commandOf name unit; }
 
-    # an anchor has no command of its own, and a scripted unit without one is not a unit. The
-    # `true` is the whole of it: reached, therefore started.
-    // lib.optionalAttrs (kindOf unit == "anchor") { command = true'; }
-
     // lib.optionalAttrs (unit.user != null) { run-as = unit.user; }
     // lib.optionalAttrs (unit.environment != { }) { environment = unit.environment; }
     // lib.optionalAttrs (waitKindOf unit == "pidfile") {
       pid-file = (variantOf unit).readiness.waitFor.pidfile.file;
     }
-    // lib.optionalAttrs (unit.startTimeout != null) { start-timeout = unit.startTimeout; }
-    // lib.optionalAttrs (unit.stopTimeout != null) { stop-timeout = unit.stopTimeout; }
-    # the first trunk level depends on the latch, so the latch is started before anything
-    # else and therefore stopped after everything else - which is what makes it mean
-    # "every unit before me has stopped"
-    // lib.optionalAttrs (name == lib.head trunk.levels && latchName != null) {
-      depends-on = [ latchName ];
+    # always said, because dinit's own default is sixty seconds and the contract's is no bound at
+    # all: an unset `startTimeout` means the same on every implementation. 0 is dinit for
+    # unlimited.
+    // {
+      start-timeout = startTimeoutOf unit;
+    }
+    // lib.optionalAttrs ((variantOf unit).stopTimeout or null != null) {
+      stop-timeout = (variantOf unit).stopTimeout;
     };
 
-  mkShutdownSide =
-    unit:
-    {
-      type = "scripted";
-      command = true';
-      depends-on = successorOf unit.name;
-      default = true;
-
-      # the latch brackets the whole system: started first, stopped last. dinit documents
-      # kill-all-on-stop for exactly this position, so shutdown work is not obstructed by
-      # orphaned processes still holding filesystems open.
-      options = lib.optionals (unit.name == latchName) [ "kill-all-on-stop" ];
-    }
-    # one stop-command for the whole shutdown side, on the latch. Per-unit stop-commands left
-    # the order to dinit, which does not keep it - see shutdownScript.
-    # and on the script existing: the levels at and after the latch are themselves shutdown-side
-    # units, so a machine whose shutdown side is only those anchors has nothing to run
-    // lib.optionalAttrs (unit.name == latchName && shutdownScript != null) {
-      stop-command = "${shutdownScript}";
-    }
-    // lib.optionalAttrs (unit.stopTimeout != null) { stop-timeout = unit.stopTimeout; };
+  # a system unit, which is a boot-side unit and, if it is a root, behind the latch
+  mkSystemUnit =
+    name: unit:
+    mkBootSide enabled name unit
+    // lib.optionalAttrs (unit.requires == [ ]) {
+      depends-on = [ latchName ];
+    };
 
   # ---- the user role ----------------------------------------------------------------
   #
@@ -276,7 +221,7 @@ let
         ${lib.getExe' config.dinit.package "dinitctl"} ${sockArgs} list 2>/dev/null |
           ${lib.getExe' pkgs.gnused "sed"} -n 's/.*][[:space:]]*//; s/[[:space:]].*//; /./p' |
           while read -r unit; do
-            case "$unit" in boot|default) continue ;; esac
+            case "$unit" in boot|default|${latchName}) continue ;; esac
             state=$(
               ${lib.getExe' config.dinit.package "dinitctl"} ${sockArgs} status "$unit" 2>/dev/null |
                 ${lib.getExe' pkgs.gnused "sed"} -n 's/^[[:space:]]*State:[[:space:]]*//p'
@@ -359,6 +304,8 @@ let
         source = settingsFormat.generate (waitNameOf name) {
           type = "scripted";
           command = "${readinessLib.scriptFor name (variantOf unit).readiness}";
+          # the wait is the service starting, so whatever bounds the service bounds this
+          start-timeout = startTimeoutOf unit;
           depends-ms = [ name ];
         };
       }
@@ -374,18 +321,6 @@ let
           lib.attrNames u.units
           ++ map waitNameOf (lib.attrNames (lib.filterAttrs (_: needsWaitUnit) u.units));
       };
-
-      # the head of the trunk, in this user's namespace.
-      #
-      # `requires` defaults to the head of the tree a unit is in, and the unit type is shared with
-      # the system's, so a user unit which said nothing about ordering named this. It is an anchor
-      # there and an anchor here: something to attach to, which is reached immediately because it
-      # waits for nothing.
-      "${userDir user}/${lib.head cfg.trunk.levels}".source =
-        settingsFormat.generate (lib.head cfg.trunk.levels)
-          {
-            type = "internal";
-          };
     };
 
 in
@@ -536,8 +471,10 @@ in
       };
 
       dinit.services =
-        lib.mapAttrs (mkBootSide enabled) (lib.filterAttrs (n: u: !(onShutdownSide n u)) enabled)
-        // lib.listToAttrs (map (unit: lib.nameValuePair unit.name (mkShutdownSide unit)) shutdownOrdered)
+        lib.mapAttrs mkSystemUnit enabled
+        // {
+          ${latchName} = latch;
+        }
 
         # one per unit whose readiness dinit cannot observe: a scripted unit which blocks until
         # the thing is live and then completes, which is dinit's own way of saying "started".
@@ -552,10 +489,12 @@ in
             # command is a string. scriptFor hands back a derivation for every waitFor kind bar
             # `check`, where it is the command the configuration supplied.
             command = "${readinessLib.scriptFor name (variantOf unit).readiness}";
+            # the wait is the service starting, so whatever bounds the service bounds this
+            start-timeout = startTimeoutOf unit;
             depends-ms = [ name ];
             default = true;
           }
-        ) (lib.filterAttrs (n: u: !(onShutdownSide n u) && needsWaitUnit u) enabled);
+        ) (lib.filterAttrs (_: needsWaitUnit) enabled);
 
       # dinit's service files are a strict key/value format with no room for opaque metadata, so
       # each unit's fingerprint is written beside them instead. `list` reads them back.
@@ -579,7 +518,9 @@ in
           ${lib.getExe' config.dinit.package "dinitctl"} list 2>/dev/null |
           ${lib.getExe' pkgs.gnused "sed"} -n 's/.*][[:space:]]*//; s/[[:space:]].*//; /./p' |
             while read -r unit; do
-              case "$unit" in boot|default) continue ;; esac
+              # dinit's own roots, and the shutdown latch, which are this backend's and not the
+              # contract's: the engine has no fingerprint for them and nothing to reconcile
+              case "$unit" in boot|default|${latchName}) continue ;; esac
 
               ${lib.getExe' config.dinit.package "dinitctl"} status "$unit" 2>/dev/null |
                 ${lib.getExe' pkgs.gnugrep "grep"} -q 'State: STARTED' || continue
@@ -686,7 +627,7 @@ in
         user: _:
         lib.nameValuePair "user-services-dir--${user}" {
           description = "control socket directory for ${user}";
-          requires = [ "sysinit" ];
+          requires = [ "tmpfiles-setup" ];
           type.oneshot.command = pkgs.writeShellScript "user-services-dir-${user}" ''
             ${lib.getExe' pkgs.coreutils "mkdir"} -p ${socketDir user}
             ${lib.getExe' pkgs.coreutils "chown"} ${user} ${socketDir user}

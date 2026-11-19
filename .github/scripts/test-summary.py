@@ -14,6 +14,16 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 ANSI = re.compile(r"\x1b\[[0-?]*[ -/]*[@-~]")
+# Every VM test a pull request runs, one job each: the provider suites, the top-level tests and
+# tests/modules-vm. Not tests/modules-boot, which boots every module on every implementation -
+# some seven hundred machines, past both the 256 jobs a matrix may have and what one evaluation
+# of them all fits in on a runner - and not tests/modules, which is evaluation rather than VMs
+# and runs as a job of its own. Both stay `nix-build tests -A ...` away.
+SKIPPED_SUITES = ('modules', 'modules-boot')
+# top-level tests left out by name prefix. The no-initrd tests boot from a real disk image of
+# their whole closure, which does not finish inside a job's hour on a runner with a cold cache.
+SKIPPED_PREFIXES = ('no-initrd',)
+
 DISCOVER = r'''
 let
   walk = path: value:
@@ -24,8 +34,14 @@ let
         (name: walk (path ++ [name]) (builtins.getAttr name value))
         (builtins.attrNames value))
     else [];
-in walk [] (import ./tests {})
-'''
+  tests = import ./tests {};
+  prefixes = [ PREFIXES ];
+  skipped = name: builtins.any
+    (prefix: builtins.substring 0 (builtins.stringLength prefix) name == prefix) prefixes;
+in walk [] (builtins.removeAttrs tests
+  ([ SKIPPED ] ++ builtins.filter skipped (builtins.attrNames tests)))
+'''.replace('SKIPPED', ' '.join(f'"{s}"' for s in SKIPPED_SUITES)).replace(
+    'PREFIXES', ' '.join(f'"{p}"' for p in SKIPPED_PREFIXES))
 
 
 def list_tests():

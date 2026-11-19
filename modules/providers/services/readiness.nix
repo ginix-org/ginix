@@ -2,7 +2,8 @@
 #
 # Imported by the implementations rather than reached through an option, because it is a
 # function and every one of them needs the same answer: given a unit's waitFor, a program which
-# returns once that unit is genuinely up.
+# returns once that unit is genuinely up. Modules get the bare waits as
+# `providers.services.lib.waitFor`, for a oneshot whose whole job is to wait.
 #
 # Where a backend has a native mechanism for a kind it should use that instead - finit and
 # dinit both observe a forking daemon directly - and fall back to this for the rest. What each
@@ -47,28 +48,43 @@ rec {
   # message and latched nothing.
   waitForPath = path: "${finixWait} path ${arg "<latch>" path}\n";
 
+  # each wait as a command, for a module to use as a oneshot's - which is how a unit gates its
+  # dependants on something appearing. Exposed as `providers.services.lib.waitFor`.
+  #
+  # `check` is not here: its command does its own waiting, so as a oneshot it is simply the
+  # command.
+  waitFor = waitForNamed "<waitFor>";
+
+  # the same, with the unit's name for the error a bad path raises
+  waitForNamed = name: {
+    path = path: "${finixWait} path ${arg name path}";
+    socket = path: "${finixWait} socket ${arg name path}";
+    pidfile = file: "${finixWait} pidfile ${arg name file}";
+  };
+
   # null when the kind needs no command - either the unit reports readiness itself, or the
   # backend is expected to observe it natively
   scriptFor =
     name: readiness:
     let
       kind = lib.head (lib.attrNames readiness);
-      waitFor = readiness.waitFor or null;
-      wait = if waitFor == null then null else lib.head (lib.attrNames waitFor);
+      spec = readiness.waitFor or null;
+      wait = if spec == null then null else lib.head (lib.attrNames spec);
+      named = waitForNamed name;
     in
     if kind != "waitFor" then
       null
 
     else if wait == "check" then
       # the command does its own waiting; returning is the signal
-      waitFor.check.command
+      spec.check.command
 
     else if wait == "socket" then
-      "${finixWait} socket ${arg name waitFor.socket.path}"
+      named.socket spec.socket.path
 
     else if wait == "pidfile" then
-      "${finixWait} pidfile ${arg name waitFor.pidfile.file}"
+      named.pidfile spec.pidfile.file
 
     else
-      "${finixWait} path ${arg name waitFor.path.path}";
+      named.path spec.path.path;
 }

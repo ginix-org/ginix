@@ -34,20 +34,24 @@
     {
       imports = [ ../lib/contract-base.nix ];
 
+      # finit's own `initctl`, whose JSON this test reads, rather than the front-end over every
+      # implementation which would otherwise be installed in front of it
+      providers.services.ctl.enable = false;
+
       providers.services.units = {
         keeper = {
           type.service.command = daemon "keeper" "gen1";
-          requires = [ "sysinit" ];
+          requires = [ "tmpfiles-setup" ];
         };
 
         goner = {
           type.service.command = daemon "goner" "gen1";
-          requires = [ "sysinit" ];
+          requires = [ "tmpfiles-setup" ];
         };
 
         changer = {
           type.service.command = daemon "changer" "gen1";
-          requires = [ "sysinit" ];
+          requires = [ "tmpfiles-setup" ];
         };
 
         dependant = {
@@ -66,7 +70,7 @@
 
           newcomer = {
             type.service.command = daemon "newcomer" "gen2";
-            requires = [ "sysinit" ];
+            requires = [ "tmpfiles-setup" ];
           };
         };
       };

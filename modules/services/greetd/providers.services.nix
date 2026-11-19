@@ -30,17 +30,24 @@ in
       # What this gives up is that the greeter keeps running with the definition it started from
       # until something restarts it - a reboot, or `initctl restart greetd` by someone who meant
       # it. That is the right trade for a unit whose restart is a logout.
-      restartIfChanged = false;
+      type.service.restartIfChanged = false;
 
-      # `multi-user`, like any other login prompt: a greeter before the system is up offers a
-      # session into a half-built machine. `runlevels = "34"` had no contract equivalent - the
-      # trunk has no notion of a level a service is simply not considered on - and on a machine
-      # booting to 2 it meant greetd never started at all.
-      #
-      # The session and seat managers are in earlier tiers, and so are their socket gates, so
-      # none of them is named here - a greeter starts a compositor, and what a compositor needs
-      # is the seat socket answering, which the tier before this one has already waited for.
-      requires = [ "multi-user" ];
+      # a greeter: the filesystems, the logger, the bus and polkit, and whichever seat and
+      # session managers this machine has - a greeter starts a compositor, and what a compositor
+      # needs is the seat socket answering, which is the seat manager's readiness.
+      # `runlevels = "34"` had no contract equivalent - there is no level a service is simply
+      # not considered on - and on a machine booting to 2 it meant greetd never started at all.
+      requires = [
+        "tmpfiles-setup"
+      ]
+      ++ config.providers.services.lib.present [
+        "syslogd"
+        "dbus"
+        "polkit"
+        "elogind"
+        "sessiond"
+        "seatd"
+      ];
 
       type.service.command = "${pkgs.greetd}/bin/greetd --config ${cfg.configFile}";
     };

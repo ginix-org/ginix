@@ -16,7 +16,16 @@ in
   config = lib.mkIf cfg.enable {
     providers.services.units.iwd = {
       description = "wireless service";
-      requires = [ "basic" ];
+
+      # its state, the bus it is driven over, the logger, and the firewall where there is one
+      requires = [
+        "tmpfiles-setup"
+      ]
+      ++ config.providers.services.lib.present [
+        "dbus"
+        "syslogd"
+        "nftables"
+      ];
 
       # iwd runs resolvconf by name when it has one
       path = lib.optional config.programs.resolvconf.enable config.programs.resolvconf.package;
@@ -27,7 +36,7 @@ in
       # only finit ever fell for, leaving every other init running the old configuration.
       # read from a fixed path and named nowhere else, so a changed configuration would
       # otherwise leave the daemon running with the old one
-      reloadTriggers = [ cfg.configFile ];
+      type.service.reloadTriggers = [ cfg.configFile ];
 
       type.service.command = "${cfg.package}/libexec/iwd${lib.optionalString cfg.debug " -d"}";
     };

@@ -11,7 +11,7 @@ in
   name = "modules.micolash-${backend}";
 
   nodes.machine =
-    { modules, ... }:
+    { config, modules, ... }:
     {
       imports =
         with modules;
@@ -30,19 +30,6 @@ in
 
       finit.runlevel = 3;
 
-      # their finit, because keventd asserts 5.0 and nixpkgs has 4.17. It is also the reason
-      # keventd is skipped by tests/modules, so this is the first time it is booted at all.
-      finit.package = pkgs.finit.overrideAttrs (o: {
-        version = "5.0";
-        src = pkgs.fetchFromGitHub {
-          owner = "finit-project";
-          repo = "finit";
-          rev = "ad8ed05d64a4e274e39ac2d061fe8c3aa8a87c22";
-          sha256 = "sha256-SJTnrcgRx/M07pOQAnm+LeiXSq9YGCON2yHLaKCMyJw=";
-        };
-        buildInputs = o.buildInputs ++ [ pkgs.util-linuxMinimal.dev ];
-      });
-
       services.keventd.enable = true;
       services.mdevd.enable = lib.mkForce false;
 
@@ -60,7 +47,7 @@ in
       programs.xwayland-satellite.enable = true;
       programs.gnome-keyring.enable = true;
 
-      providers.services.units.booted = coreLib.bootedUnit;
+      providers.services.units.booted = coreLib.bootedUnit config.providers.services.units;
       providers.services.tmpfiles.rules = lib.mkMerge [
         [
           {
@@ -80,7 +67,10 @@ in
 
   testScript = ''
     machine.start()
-    machine.wait_until_succeeds("test -e ${coreLib.bootedMarker}", timeout=120)
+    # generous: this is the heaviest machine in the suite - a compositor, a greeter, audio, wifi -
+    # and the marker waits for every one of its units. Under emulation, which is what a builder
+    # without /dev/kvm runs it in, two minutes is not enough to boot it at all.
+    machine.wait_until_succeeds("test -e ${coreLib.bootedMarker}", timeout=600)
     machine.succeed("cat /run/tmpfiles-setup.log >&2")
     machine.shutdown()
   '';

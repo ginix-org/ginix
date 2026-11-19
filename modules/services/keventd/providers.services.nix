@@ -17,9 +17,8 @@ in
     providers.services.units.keventd = {
       description = "device event daemon (keventd)";
 
-      # a device manager belongs in the head tier, beside udev and mdevd: `sysinit` then waits
-      # for it, and everything in a later tier has device events without asking.
-      requires = [ (lib.head config.providers.services.trunk.levels) ];
+      # a device manager requires nothing: it has to be up before anything which needs a device,
+      # and those name `devices-settled` - which keventd has none of, so they simply do not wait.
 
       # the udev cfg.rules keventd runs invoke helpers by name, so it needs a PATH. Every
       # implementation gives a unit one now - dinit's is scripted in by its backend rather
@@ -28,7 +27,7 @@ in
 
       # read from a fixed path and named nowhere else, so a changed ruleset would
       # otherwise leave the daemon running with the old one
-      reloadTriggers = [ cfg.rules ];
+      type.service.reloadTriggers = [ cfg.rules ];
 
       type.service = {
         # the cfg.rules are read from /etc/udev/cfg.rules.d, but the unit names the tree they were

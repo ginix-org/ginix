@@ -16,7 +16,7 @@ in
   config = lib.mkIf cfg.enable {
     providers.services.units.earlyoom = {
       description = "early oom daemon";
-      requires = [ "basic" ];
+      requires = [ "tmpfiles-setup" ] ++ config.providers.services.lib.present [ "syslogd" ];
 
       # with `-n` earlyoom sends desktop notifications through dbus-send
       path = lib.optional (lib.elem "-n" cfg.extraArgs) pkgs.dbus;

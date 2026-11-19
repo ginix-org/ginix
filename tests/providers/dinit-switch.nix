@@ -37,25 +37,16 @@
       # one choice, and it is the whole of the configuration's opinion about init: dinit
       # supervises the units and dinit is what the kernel starts.
       providers.services.backend = "dinit";
-      providers.services.trunk.levels = [
-        "start"
-        "sysinit"
-        "basic"
-        "multi-user"
-        "running"
-        "stopped"
-        "shutdown"
-      ];
 
       providers.services.units = {
         keeper = {
           type.service.command = daemon "keeper";
-          requires = [ "sysinit" ];
+          requires = [ "tmpfiles-setup" ];
         };
 
         drifter = {
           type.service.command = daemon "drifter";
-          requires = [ "sysinit" ];
+          requires = [ "tmpfiles-setup" ];
         };
       };
     };

@@ -18,7 +18,7 @@ let
       false;
 in
 {
-  imports = [ ./providers.ttys.nix ];
+  imports = [ ./providers.services.nix ];
 
   options.services.autologin = {
     enable = lib.mkOption {

@@ -19,14 +19,13 @@
   # switched off, because the module only knew how to write stanzas.
   services.mdevd.enable = true;
 
-  # a terminal is not a daemon: no readiness signal, and nothing ever depends on one. So it is
-  # its own provider rather than something a module declares directly - but what it hands to
-  # the contract is an ordinary supervised prompt, same as any other `providers.services` unit.
-  services.getty.enable = false;
-  providers.ttys.devices.tty1 = {
-    description = "getty on /dev/tty1";
-    requires = [ ];
+  # one login prompt, on tty1, attached to nothing: a machine which stalls should still offer a
+  # console to look at
+  services.getty = {
+    enable = true;
+    ttys = [ "tty1" ];
   };
+  providers.services.units.tty-tty1.requires = [ ];
 
   providers.services.backend = "finit";
 }

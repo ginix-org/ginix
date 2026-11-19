@@ -17,8 +17,7 @@ in
     providers.services.units.illum = {
       description = "backlight adjustment service";
 
-      # nothing about syslogd: it is in the head tier, so anything here is after it
-      requires = [ "basic" ];
+      requires = [ "tmpfiles-setup" ] ++ config.providers.services.lib.present [ "syslogd" ];
 
       type.service.command = lib.getExe cfg.package;
     };

@@ -17,18 +17,18 @@ in
     providers.services.units.nftables = {
       description = "load the firewall ruleset";
 
-      # `sysinit`, so the ruleset is in place before the basic tier - a machine should not be
-      # reachable before its firewall is. syslogd is in the head tier and needs no naming.
-      requires = [ "sysinit" ];
+      # as early as it can be: a machine should not be reachable before its firewall is, and
+      # whatever brings an interface up or listens on one names this unit where it exists. Its
+      # one requirement is `tmpfiles-setup`, which puts in place the state file the ruleset
+      # `include`s - without it nft fails on the missing include and nothing is loaded at all.
+      requires = [ "tmpfiles-setup" ];
 
       type.oneshot.command = cfg.startScript;
     };
 
     providers.services.units.nftables-flush = {
       description = "unload the firewall ruleset";
-      requires = [ "stopped" ];
-
-      type.oneshot.command = cfg.stopScript;
+      type.shutdown.command = cfg.stopScript;
     };
 
     providers.services.tmpfiles.rules = [

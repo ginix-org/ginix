@@ -12,9 +12,9 @@
 # machine, and the only reason it was ever seen is that resolvconf happened to have one.
 #
 # So: one machine per module per implementation, which asserts exactly one thing - that the
-# system still reaches the top of its trunk. That is a real question and a cheap one to ask.
-# Every unit a module adds attaches to a trunk level, and a level waits for its dependants, so
-# a daemon which never signals readiness stalls the trunk and the marker never appears. The
+# system still finishes booting. That is a real question and a cheap one to ask. A marker unit
+# requires every other unit the machine starts, so a daemon which never signals readiness holds
+# it back and the marker never appears. The
 # failure mode this catches is precisely "enabled, and silently never came up".
 #
 # What it deliberately does not assert is behaviour. Whether the daemon serves, speaks its
@@ -23,11 +23,22 @@
 {
   lib,
   pkgs,
-  mkTest,
   ...
 }:
 let
-  testLib = import ../lib { inherit lib pkgs; };
+  # its own nixpkgs, which will evaluate unfree packages. These machines are built and booted,
+  # and a module whose package is unfree - 1password - is as much a module as any other: refused
+  # by the default nixpkgs, it raised while its derivation was being computed, which nothing
+  # here could catch, and took the listing of every test in the repository down with it.
+  bootPkgs = import pkgs.path {
+    inherit (pkgs.stdenv.hostPlatform) system;
+    config.allowUnfree = true;
+  };
+
+  testLib = import ../lib {
+    inherit lib;
+    pkgs = bootPkgs;
+  };
   coreLib = import ../providers/core/lib.nix { inherit pkgs lib; };
 
   backends = [
@@ -116,7 +127,7 @@ let
 
   machine =
     kind: name: backend:
-    { modules, ... }:
+    { config, modules, ... }:
     {
       imports = lib.optional (backend != "finit") modules.${backend};
 
@@ -128,18 +139,16 @@ let
           # what the getty row does, and a flat `false` here would be a conflict rather than a
           # default to override.
           services.getty.enable = lib.mkDefault false;
-          services.mdevd.enable = lib.mkDefault true;
-
-          # a terminal, attached to nothing: what this test waits on is the trunk, and a prompt
-          # is for looking at one which stalled. Not declared when getty is the module under
-          # test - it provides its own, on the same tty, and two units for one terminal is a
-          # conflict about the test rather than about the module.
-          providers.ttys.devices = lib.mkIf (name != "getty") {
-            tty1 = {
-              description = "getty on /dev/tty1";
-              requires = [ ];
-            };
-          };
+          #
+          # mdevd, unless the row is another device manager: two on one machine handle every event
+          # twice, and both define `devices-settled`
+          services.mdevd.enable = lib.mkDefault (
+            !(lib.elem name [
+              "udev"
+              "gardendevd"
+              "keventd"
+            ])
+          );
 
           providers.services.tmpfiles.rules = [
             {
@@ -148,10 +157,21 @@ let
             }
           ];
 
-          # the marker itself, at the top of the trunk. Reaching it means every level below was
-          # reached, which means everything attached to those levels became ready.
-          providers.services.units.booted = coreLib.bootedUnit;
+          # the marker itself, requiring every other unit the machine starts. Reaching it means
+          # everything a module added became ready.
+          providers.services.units.booted = coreLib.bootedUnit config.providers.services.units;
         }
+
+        # a terminal, attached to nothing: what this test waits on is the boot, and a prompt is
+        # for looking at one which stalled. Not declared when getty is the module under test -
+        # it provides its own, and narrowing it to one tty would be testing something else.
+        (lib.mkIf (name != "getty") {
+          services.getty = {
+            enable = true;
+            ttys = [ "tty1" ];
+          };
+          providers.services.units.tty-tty1.requires = [ ];
+        })
 
         (lib.setAttrByPath [ kind (enableOf name) "enable" ] true)
       ];
@@ -164,7 +184,7 @@ let
     testScript = ''
       machine.start()
 
-      # generous, and deliberately so: this is asking whether the trunk completes at all, not
+      # generous, and deliberately so: this is asking whether the boot completes at all, not
       # how quickly. A module which is slow is not the failure being looked for; one which
       # never arrives is.
       machine.wait_until_succeeds("test -e ${coreLib.bootedMarker}", timeout=300)
@@ -181,7 +201,15 @@ let
   attempt =
     kind: name: backend:
     let
-      r = builtins.tryEval (mkTest (test kind name backend));
+      # the derivation path forced inside the tryEval, not only the test: a module which cannot be
+      # evaluated here fails while that path is computed, and left lazy that happened wherever it
+      # was first asked for - the test listing, which then failed as a whole
+      r = builtins.tryEval (
+        let
+          t = testLib.mkTest (test kind name backend);
+        in
+        builtins.seq t.drvPath t
+      );
     in
     if r.success then
       r.value

@@ -18,7 +18,8 @@ in
       description = "create the postgresql cluster";
 
       inherit (cfg) user group;
-      requires = [ "sysinit" ];
+      # the data directory, which is on a mounted filesystem
+      requires = [ "tmpfiles-setup" ];
 
       type.oneshot.command = pkgs.writeShellScript "postgresql-initdb.sh" ''
         if [ ! -f "${cfg.dataDir}/PG_VERSION" ]; then
@@ -32,16 +33,20 @@ in
 
       inherit (cfg) user group;
 
-      # the logger and loopback are both behind the tier which completes `basic`
+      # the cluster, its directories, the logger, and the firewall where there is one
       requires = [
-        "basic"
+        "tmpfiles-setup"
       ]
-      ++ lib.optional cfg.initdb.enable "postgresql-initdb";
+      ++ lib.optional cfg.initdb.enable "postgresql-initdb"
+      ++ config.providers.services.lib.present [
+        "syslogd"
+        "nftables"
+      ];
 
       # `kill = 120` was finit's; a database is the case the option was written for. A
       # checkpoint on shutdown can take minutes on a large cluster, and being killed part way
       # through one is how a cluster comes back needing recovery.
-      stopTimeout = 120;
+      type.service.stopTimeout = 120;
 
       type.service = {
         command = "${lib.getExe' cfg.package "postgres"} " + lib.escapeShellArgs cfg.extraArgs;

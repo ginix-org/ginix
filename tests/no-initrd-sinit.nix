@@ -8,7 +8,7 @@
 # line" while having a perfectly correct one.
 #
 # This is that path: sinit, which is the barest of the five, booting from a disk with no stage 1
-# at all. It also prints how long the trunk took, which is not asserted - a machine which is
+# at all. It also prints how long the boot took, which is not asserted - a machine which is
 # slow is not the failure being looked for - but is the only measurement of a no-initrd boot
 # anywhere here, and cheap to keep.
 {
@@ -18,6 +18,7 @@
     {
       config,
       pkgs,
+      lib,
       modules,
       ...
     }:
@@ -29,24 +30,24 @@
       services.mdevd.enable = true;
 
       # the scaffolding every other sinit test has: a terminal attached to nothing, so a
-      # stalled machine still offers a prompt, and getty off because the contract supplies it
-      services.getty.enable = false;
-      providers.ttys.devices.tty1 = {
-        description = "getty on /dev/tty1";
-        requires = [ ];
+      # stalled machine still offers a prompt: one getty, on tty1
+      services.getty = {
+        enable = true;
+        ttys = [ "tty1" ];
       };
+      providers.services.units.tty-tty1.requires = [ ];
 
       fileSystems."/" = {
         device = "/dev/vda";
         fsType = "ext4";
       };
 
-      # /proc/uptime at the moment each level is reached: seconds since the kernel started,
+      # /proc/uptime at two points in the boot: seconds since the kernel started,
       # which is the only clock that means the same thing on every backend.
       providers.services.units = {
         stamp-multi-user = {
-          description = "stamp when multi-user is reached";
-          requires = [ "multi-user" ];
+          description = "stamp when the filesystems and volatile files are in place";
+          requires = [ "tmpfiles-setup" ];
           type.oneshot.command = pkgs.writeShellScript "stamp-mu" ''
             ${pkgs.coreutils}/bin/mkdir -p /run/timing
             ${pkgs.coreutils}/bin/cut -d' ' -f1 /proc/uptime > /run/timing/multi-user
@@ -54,8 +55,12 @@
         };
 
         stamp-running = {
-          description = "stamp when the trunk is done";
-          requires = [ "running" ];
+          description = "stamp when every other unit is up";
+          requires = lib.attrNames (
+            lib.filterAttrs (
+              name: unit: name != "stamp-running" && unit.enable && !(unit.type ? shutdown)
+            ) config.providers.services.units
+          );
           type.oneshot.command = pkgs.writeShellScript "stamp-running" ''
             ${pkgs.coreutils}/bin/mkdir -p /run/timing
             ${pkgs.coreutils}/bin/cut -d' ' -f1 /proc/uptime > /run/timing/running
@@ -93,12 +98,12 @@
         machine.succeed("grep -q 'root=/dev/vda' /proc/cmdline")
         machine.succeed("test -L /run/current-system")
 
-    with subtest("and the trunk completed"):
+    with subtest("and the boot completed"):
         machine.succeed("test -e /run/timing/multi-user")
 
     mu = machine.succeed("cat /run/timing/multi-user").strip()
     run = machine.succeed("cat /run/timing/running").strip()
-    print(f"TIMING sinit, no initrd: multi-user at {mu}s, trunk top at {run}s since kernel start")
+    print(f"TIMING sinit, no initrd: early boot at {mu}s, everything up at {run}s since kernel start")
 
     machine.shutdown()
   '';

@@ -43,14 +43,14 @@ in
         as-alice = {
           type.service.command = whoami "as-alice";
           user = "alice";
-          requires = [ "sysinit" ];
+          requires = [ "tmpfiles-setup" ];
         };
 
         # the control. Without it, an implementation which ran everything as root would pass
         # nothing here - but one which ran everything as alice would also look correct.
         as-root = {
           type.service.command = whoami "as-root";
-          requires = [ "sysinit" ];
+          requires = [ "tmpfiles-setup" ];
         };
       };
     };

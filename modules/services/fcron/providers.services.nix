@@ -20,9 +20,9 @@ in
       description = "reload fcrontab";
 
       # the setuid wrappers are a contract unit, so this is an ordinary edge now rather than a
-      # condition naming finit's own task. syslogd is in the head tier and needs no naming.
+      # condition naming finit's own task
       requires = [
-        "basic"
+        "tmpfiles-setup"
         "suid-sgid-wrappers"
       ];
 
@@ -41,7 +41,7 @@ in
 
       # not after `fcrontab`: fcron notices a changed systab and reloads it itself, while an edge
       # to the oneshot restarted the daemon whenever the systab changed
-      requires = [ "basic" ];
+      requires = [ "tmpfiles-setup" ] ++ config.providers.services.lib.present [ "syslogd" ];
 
       # `--foreground`, so the process running is all any backend can observe
       type.service.command = "${cfg.package}/bin/fcron --foreground " + lib.escapeShellArgs cfg.extraArgs;

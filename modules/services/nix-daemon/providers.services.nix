@@ -19,7 +19,7 @@ in
 
       # read from a fixed path and named nowhere else, so a changed configuration
       # would otherwise leave the daemon running with the old one
-      reloadTriggers = [ cfg.configFile ];
+      type.service.reloadTriggers = [ cfg.configFile ];
 
       type.service = {
         # the daemon reads /etc/nix/nix.conf, but the unit names the file that was generated
@@ -48,10 +48,9 @@ in
 
       environment.CURL_CA_BUNDLE = config.security.pki.caBundle;
 
-      # `basic` puts it in the multi-user tier: nothing earlier needs to build anything, and
-      # gating the basic tier on the daemon would hold the trunk for something no other
-      # service waits on. syslogd is in the head tier, so this is already after it.
-      requires = [ "basic" ];
+      # its state and the logger, and nothing else: nothing early needs to build anything, and
+      # whatever does names this unit.
+      requires = [ "tmpfiles-setup" ] ++ config.providers.services.lib.present [ "syslogd" ];
     };
 
     # Kept as a name for consumers to require, now that `nix-daemon` itself means "answering":

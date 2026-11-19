@@ -18,7 +18,15 @@ in
   config = lib.mkIf cfg.enable {
     providers.services.units.chronyd = {
       description = "chrony ntp daemon";
-      requires = [ "basic" ];
+
+      # its state, the logger, and the firewall where there is one
+      requires = [
+        "tmpfiles-setup"
+      ]
+      ++ config.providers.services.lib.present [
+        "syslogd"
+        "nftables"
+      ];
 
       type.service = {
         command = "${cfg.package}/bin/chronyd " + lib.escapeShellArgs cfg.extraArgs;

@@ -18,25 +18,27 @@
 ```
   providers.services.units = {
     pg-init = {
-      type = "oneshot";
-      command = "${cfg.package}/bin/initdb -D ${cfg.dataDir}";
-      requires = [ "sysinit" ];
+      type.oneshot.command = "${cfg.package}/bin/initdb -D ${cfg.dataDir}";
+      requires = [ "tmpfiles-setup" ];
     };
 
     postgres = {
-      command = "${cfg.package}/bin/postgres -D ${cfg.dataDir}";
-      requires = [ "pg-init" ];
-      stopTimeout = 120;
+      type.service = {
+        command = "${cfg.package}/bin/postgres -D ${cfg.dataDir}";
+        stopTimeout = 120;
+      };
+      requires = [ "pg-init" ] ++ config.providers.services.lib.present [ "syslogd" ];
     };
+
+    # runs once, on the way down, after everything else has stopped
+    pg-cleanup.type.shutdown.command = "${pkgs.coreutils}/bin/rm -f /run/postgresql/.s.PGSQL.*";
   };
 ```
 
-  Interchangeable implementations are selected by their own `providers.` contract and define the same unit name, so
-  dependants name the concept rather than the implementation - `requires = [ "syslogd" ]`, whichever logger is in use.
-
-  `providers.services.trunk` optionally defines a chain of process-less units standing in for runlevels. A level is
-  somewhere to attach, not a barrier: it orders the tiers coarsely, but only waits for the units which named it, so
-  anything that genuinely needs a subsystem must require that subsystem's unit directly.
+  Nothing is implied: a unit which requires nothing starts with the boot. Interchangeable implementations define the
+  same unit name, so dependants name the concept rather than the implementation - `syslogd` whichever logger is in
+  use, `devices-settled` whichever device manager - and `providers.services.lib.present` keeps the names this machine
+  has, so a unit can name one without failing where there is none.
 
 - `providers.privileges` - a high level abstraction over `sudo` (`sudo-rs`, `doas`, `please`, etc...), for example:
 

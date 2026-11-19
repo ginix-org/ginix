@@ -218,10 +218,10 @@ in
     providers.services.units.binfmt = {
       description = "register binary formats with the kernel";
 
-      # sysinit, not multi-user: a format has to be registered before anything which might
-      # exec a foreign binary runs, and that includes activation scripts and the rest of the
-      # graph. The mount above is an fstab entry, so it is already in place by this point.
-      requires = [ "sysinit" ];
+      # early: a format has to be registered before anything which might exec a foreign binary
+      # runs, and that includes activation scripts and the rest of the graph. The mount above
+      # is an fstab entry, so it is `mount-filesystems` which puts it there.
+      requires = config.providers.services.lib.present [ "mount-filesystems" ];
 
       type.oneshot.command = toString register;
     };

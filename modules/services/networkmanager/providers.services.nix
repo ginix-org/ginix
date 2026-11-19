@@ -17,15 +17,23 @@ in
     providers.services.units.network-manager = {
       description = "network manager service";
 
-      # the bus and its socket gate are in the head tier, so `service/dbus/ready` is behind
-      # this without being named. wpa_supplicant is named so that it is on the bus before
-      # NetworkManager first looks for it, rather than NetworkManager starting with wifi
-      # unavailable and waiting for the name to appear.
-      requires = [ "basic" ] ++ lib.optional config.services.wpa_supplicant.enable "wpa_supplicant";
+      # the bus, which is how it is driven, its state, the logger, and the firewall where there
+      # is one. wpa_supplicant is named so that it is on the bus before NetworkManager first
+      # looks for it, rather than NetworkManager starting with wifi unavailable and waiting for
+      # the name to appear.
+      requires = [
+        "tmpfiles-setup"
+      ]
+      ++ config.providers.services.lib.present [
+        "dbus"
+        "syslogd"
+        "nftables"
+        "wpa_supplicant"
+      ];
 
       # read from a fixed path and named nowhere else, so a changed configuration
       # would otherwise leave the daemon running with the old one
-      reloadTriggers = [ cfg.configFile ];
+      type.service.reloadTriggers = [ cfg.configFile ];
 
       type.service = {
         # the config is named here because nothing else in the unit mentions it: NetworkManager

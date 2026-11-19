@@ -45,8 +45,15 @@ let
   # the preamble the kernel runs before any backend: see pkgs/finix-init
   finixInit = pkgs.callPackage ../../../pkgs/finix-init { };
 
-  # the same waiting a service's `waitFor` readiness does, for a oneshot's
+  # the same waiting a service's `waitFor` readiness does, handed to modules as commands
   readinessLib = import ./readiness.nix { inherit pkgs lib; };
+
+  shutdownLib = import ./shutdown.nix { inherit pkgs lib; };
+
+  # what a unit's `type` says for a service, or nothing for a kind which has no such field.
+  # The lifecycle options live on the kinds with a process, so a question about one is asked of
+  # the variant rather than of the unit.
+  serviceOf = unit: unit.type.service or { };
 
   pathOrStr = with lib.types; coercedTo path (x: "${x}") str;
   program =
@@ -103,8 +110,9 @@ let
 
   # whether a unit can reach itself is a global property, so this one does need the walk.
   # `path` is the chain currently being descended and catches back-edges; `visited` memoises
-  # subtrees already proven clean, without which every diamond in the graph - and a trunk level
-  # requiring all of its dependants makes them ubiquitous - is re-explored once per branch.
+  # subtrees already proven clean, without which every diamond in the graph - and a daemon which
+  # names the same few early units as every other makes them ubiquitous - is re-explored once
+  # per branch.
   detect =
     path: visited: name:
     if lib.elem name path then
@@ -152,7 +160,6 @@ in
     ./ctl.nix
     ./switch.nix
     ./tmpfiles.nix
-    ./trunk.nix
     ./users.nix
   ];
 
@@ -178,11 +185,11 @@ in
       };
 
       # Nothing here describes how an implementation does something - only what it will refuse
-      # or fail to honour. `nativeAnchors` and `nativeStartOnlyEdges` used to sit here and did
-      # neither: an anchor and a start-only edge are part of the contract's vocabulary and are
-      # always available, natively on the implementations which have them and emulated on the
-      # ones which do not, with identical behaviour either way. A flag nothing reads, for a
-      # difference nothing can observe, is a worse thing to carry than the emulation.
+      # or fail to honour. `nativeStartOnlyEdges` used to sit here and did neither: a start-only
+      # edge is part of the contract's vocabulary and is always available, natively on the
+      # implementations which have it and emulated on the ones which do not, with identical
+      # behaviour either way. A flag nothing reads, for a difference nothing can observe, is a
+      # worse thing to carry than the emulation.
       readiness = lib.mkOption {
         type = lib.types.listOf (
           lib.types.enum [
@@ -486,6 +493,56 @@ in
         halt = mkCommand "halt" "halt the machine";
       };
 
+    lib = lib.mkOption {
+      readOnly = true;
+      type = lib.types.raw;
+      default = {
+        inherit (readinessLib) waitFor;
+
+        # the names given which this machine has, enabled. Only the names: whether a unit
+        # exists is decided by which modules are on, never by anything a unit requires, so
+        # asking this from inside a unit's `requires` cannot go round in a circle.
+        present = lib.filter (name: cfg.units ? ${name} && cfg.units.${name}.enable);
+      };
+      defaultText = lib.literalMD "functions; see the description";
+      example = lib.literalExpression ''
+        {
+          # a daemon which keeps state, logs, and touches hardware
+          providers.services.units.foo.requires = [
+            "tmpfiles-setup"
+          ]
+          ++ config.providers.services.lib.present [
+            "syslogd"
+            "devices-settled"
+          ];
+
+          # a gate: dependants of `dev-ttyUSB0` start once the device node is there
+          providers.services.units.dev-ttyUSB0 = {
+            type.oneshot = {
+              command = config.providers.services.lib.waitFor.path "/dev/ttyUSB0";
+              startTimeout = 60;
+            };
+          };
+        }
+      '';
+      description = ''
+        Functions for writing units.
+
+        `present` takes a list of unit names and returns those this machine has and has
+        enabled. It is how a unit names something only some machines provide - the system
+        logger is `syslogd` whichever logger it is, a device manager's settle is
+        `devices-settled` whichever device manager it is - without an edge to nothing where
+        there is none, which the contract refuses.
+
+        `waitFor.path`, `waitFor.socket` and `waitFor.pidfile` each take a path and return a
+        command which blocks until it is live - the same waits a service's
+        `readiness.waitFor` performs. As a oneshot's command they make a gate: something units
+        can require so that they start only once a device node, a socket or a file exists.
+        Bound the wait with the oneshot's `startTimeout`, or it holds everything behind it for
+        as long as the thing never appears.
+      '';
+    };
+
     units = lib.mkOption {
       default = { };
       description = ''
@@ -553,17 +610,13 @@ in
                   What kind of unit this is, and whatever that kind needs.
 
                   `service` is a long-running process. `oneshot` is a command which runs to
-                  completion and is ready once it has exited successfully. `anchor` has no
-                  process at all and is ready once its own requirements are.
+                  completion and is ready once it has exited successfully. `shutdown` is a
+                  command run once on the way down, after everything else has stopped.
 
-                  Anchors exist to be named, so a unit can say "after the system is basically
-                  up" without naming the units that means. In practice they are the trunk, and
-                  ordinary modules have no reason to declare one - an interchangeable
-                  implementation should be selected by a `providers.` contract and define the
-                  shared unit name directly, rather than hiding behind an anchor.
-
-                  A kind carrying nothing may be written as a bare string, so `type = "anchor"`
-                  and `type = { anchor = { }; }` mean the same thing.
+                  There is no kind for a unit with no process. A unit which wants to say "after
+                  the system logger" or "after devices have settled" names the unit which does
+                  that - and where several implementations can provide one thing, they define
+                  the same unit name, so whichever is enabled is what gets named.
                 '';
                 type =
                   let
@@ -574,41 +627,133 @@ in
                       '';
                     };
 
-                    # A oneshot is ready once it has exited, on every implementation. So a
-                    # oneshot's readiness is folded into its command here, once: the command is
-                    # run, then the wait, and the unit exits once both have succeeded. No
-                    # implementation needs to know about it, and none can get it differently.
+                    # ---- lifecycle ----------------------------------------------------------
                     #
-                    # A oneshot with no readiness keeps its command exactly as written, so this
-                    # changes nothing about any unit which does not ask for it.
+                    # What a process's life looks like to its supervisor and to a switch. These
+                    # live on the kinds which have a process, rather than on every unit, so that
+                    # a kind carries only what means something for it.
+
+                    terminal = lib.mkOption {
+                      type = lib.types.bool;
+                      default = false;
+                      description = ''
+                        Whether this unit's command opens a terminal itself and makes it its
+                        standard input, output and error - a getty, or a greeter run through one.
+                        An implementation must then leave the unit's output alone rather than
+                        capture it.
+
+                        Capturing is not merely pointless for such a program, it is harmful.
+                        finit's `log` forks a logger as a child of the unit's own process; the
+                        getty points its output at the terminal, the logger exits, and the unit is
+                        left holding a child it never made. `login` is then exec'd into that
+                        process, forks the shell, and waits for *any* child - reaping the logger
+                        instead, concluding the session is over, and exiting, at which point the
+                        kernel hangs up the shell before it has run a line. Every login on the
+                        machine returns straight to the prompt with nothing printed.
+                        tests/getty-login.nix pins it.
+                      '';
+                    };
+
+                    restartIfChanged = lib.mkOption {
+                      type = lib.types.bool;
+                      default = true;
+                      description = ''
+                        Whether a switch may stop and start this unit when its definition has
+                        changed.
+
+                        True for almost everything: a changed unit is one whose new definition is
+                        not what is running, and the point of a switch is to make the machine
+                        match the generation. Set false where applying the change costs more than
+                        leaving it pending, and the new definition then takes effect the next
+                        time the unit starts for any other reason.
+
+                        What that is for is a unit whose restart destroys something the user did
+                        not ask to lose. A display manager is the case: restarting it ends every
+                        session on the machine, so a switch which touched it would log the user
+                        out - and if the switch is being run *from* one of those sessions, it
+                        takes the rest of the switch with it. That is not hypothetical; it is how
+                        a generation comes to be activated and never recorded, because the tool
+                        driving it was killed between the two halves.
+
+                        Unrelated to being added or removed. A unit that is genuinely new is
+                        still started and one that is gone is still stopped - this says only that
+                        *changing* it is not reason enough to interrupt it.
+                      '';
+                    };
+
+                    reloadTriggers = lib.mkOption {
+                      type = with lib.types; listOf (either path str);
+                      default = [ ];
+                      example = lib.literalExpression "[ config.services.foo.configFile ]";
+                      description = ''
+                        Files this unit's process reads which are not named anywhere else in the
+                        unit, listed so that changing one counts as changing the unit.
+
+                        A unit's identity is what {option}`providers.services.switch` compares
+                        across a rebuild: the command, the user, the environment, and the rest of
+                        what is written here. A daemon which reads a configuration file from a
+                        fixed path - `/etc/elogind/logind.conf`, say - names it nowhere, so the
+                        file can change while every one of those stays identical, and the daemon
+                        keeps running with the configuration it started with. Nothing reports it.
+
+                        Naming the file here makes it part of the unit, so the switch acts on it.
+                        What it does is reload where it can: a changed unit which declares
+                        {option}`type.service.reload` is asked to re-read its own configuration
+                        and keeps its pid, and only one which cannot is stopped and started.
+                        Hence the name - a restart is the fallback, not the intent. Whether
+                        reloading is enough is the unit's claim to make, which is why it is made
+                        there.
+
+                        Only for what the unit does not otherwise mention. A path which already
+                        appears in the command - as an argument, or in a generated script - is
+                        part of the unit by being there, and needs no second statement.
+                      '';
+                    };
+
+                    startTimeout = lib.mkOption {
+                      type = with lib.types; nullOr ints.unsigned;
+                      default = null;
+                      description = ''
+                        How long, in seconds, this unit may take to become ready before it is
+                        considered failed. `null` is no bound at all, on every implementation -
+                        including the ones with a default of their own, which is overridden.
+
+                        For a service, subject to
+                        {option}`providers.services.supportedFeatures.startTimeout`. For a
+                        oneshot it is enforced by the unit itself - its command is run under
+                        `timeout` - so it holds on every implementation.
+                      '';
+                    };
+
+                    stopTimeout = lib.mkOption {
+                      type = with lib.types; nullOr ints.unsigned;
+                      default = null;
+                      description = ''
+                        How long, in seconds, this unit is given to exit after being asked to
+                        stop, before it is killed outright. Subject to
+                        {option}`providers.services.supportedFeatures.stopTimeout`.
+
+                        Implementation defaults are chosen for units which exit promptly and are
+                        usually only a few seconds. Anything which flushes state on the way out -
+                        a database especially - should say so here rather than be killed
+                        mid-write.
+                      '';
+                    };
+
+                    # a oneshot's start timeout is the contract's to enforce, not the
+                    # implementation's: a oneshot is a command which returns, so bounding it is
+                    # running it under `timeout`, which works everywhere. Implementations which
+                    # bound starts natively still do, with the same number - harmless, and it
+                    # keeps them from having to treat oneshots specially.
+                    #
+                    # A oneshot with no timeout keeps its command exactly as written, so its
+                    # fingerprint is unchanged by this existing.
                     oneshotCommand =
                       oneshot:
-                      let
-                        wait = readinessLib.scriptFor name oneshot.readiness;
-                        bounded =
-                          if oneshot.readinessTimeout == null then
-                            "exec ${wait}"
-                          else
-                            ''
-                              ${lib.getExe' pkgs.coreutils "timeout"} ${toString oneshot.readinessTimeout} ${wait} || {
-                                echo ${lib.escapeShellArg "${name}: not ready after ${toString oneshot.readinessTimeout}s"} >&2
-                                exit 1
-                              }
-                            '';
-                      in
-                      if oneshot.readiness == null then
-                        if oneshot.command == null then
-                          throw "providers.services.units.${name}: a oneshot needs a `command`, a `readiness`, or both"
-                        else
-                          oneshot.command
+                      if oneshot.startTimeout == null then
+                        oneshot.command
                       else
-                        # interpolated, since this is past the point where `program` would
-                        # have made a string of it and an implementation may expect one
-                        "${pkgs.writeShellScript "${name}-oneshot" ''
-                          set -e
-                          ${lib.optionalString (oneshot.command != null) oneshot.command}
-                          ${bounded}
-                        ''}";
+                        "${lib.getExe' pkgs.coreutils "timeout"} ${toString oneshot.startTimeout} ${oneshot.command}";
 
                     waitFor = lib.mkOption {
                       description = ''
@@ -831,77 +976,60 @@ in
                       service = lib.mkOption {
                         description = "A long-running process.";
                         type = lib.types.submodule {
-                          options = { inherit command readiness reload; };
-                        };
-                      };
-
-                      oneshot = lib.mkOption {
-                        description = "A command which runs to completion.";
-                        # what an implementation reads is `command` alone, with any readiness
-                        # already folded into it - see oneshotCommand above.
-                        #
-                        # Only `command`, and not the options it was made from: the switch
-                        # fingerprints `type` whole, so two fields set to null on every oneshot
-                        # would have marked every oneshot on every machine as changed, and
-                        # re-run them all on the first switch after this was added. A changed
-                        # readiness still changes the command, which is all the switch needs.
-                        apply = oneshot: { command = oneshotCommand oneshot; };
-                        type = lib.types.submodule {
                           options = {
-                            command = command // {
-                              type = lib.types.nullOr program;
-                              default = null;
-                              description = ''
-                                The command this unit runs.
-
-                                May be left out when {option}`readiness` is set, for a unit
-                                whose only job is to wait for something - a device node
-                                appearing, say - so that whatever requires it waits too.
-                              '';
-                            };
-
-                            readiness = lib.mkOption {
-                              type = lib.types.nullOr (lib.types.attrTag { inherit waitFor; });
-                              default = null;
-                              example = lib.literalExpression ''{ waitFor.path.path = "/dev/ttyUSB0"; }'';
-                              description = ''
-                                Something which must be live, after the command has exited,
-                                before this unit counts as done.
-
-                                Without it a oneshot is ready the moment its command exits
-                                successfully. With it, it is ready once the command has exited
-                                and the thing named here has appeared, and units requiring it
-                                wait for both. Every `waitFor` kind is accepted, and works on
-                                every implementation: the wait is run as part of the unit's own
-                                command, so nothing has to observe it.
-
-                                Only `waitFor`: `fork`, `notify` and `s6` describe a process
-                                which stays running, and a oneshot is one which does not.
-                              '';
-                            };
-
-                            readinessTimeout = lib.mkOption {
-                              type = with lib.types; nullOr ints.positive;
-                              default = null;
-                              example = 10;
-                              description = ''
-                                How long, in seconds, the wait in {option}`readiness` may take
-                                before the unit fails. Its dependants then never start, and
-                                the rest of the boot carries on without them.
-
-                                `null` waits indefinitely - which, for something that may never
-                                appear, holds everything behind this unit for as long as the
-                                machine is up. Unlike {option}`startTimeout` this is enforced
-                                by the unit itself, so it works on every implementation.
-                              '';
-                            };
+                            inherit
+                              command
+                              readiness
+                              reload
+                              terminal
+                              restartIfChanged
+                              reloadTriggers
+                              startTimeout
+                              stopTimeout
+                              ;
                           };
                         };
                       };
 
-                      anchor = lib.mkOption {
-                        description = "A unit with no process at all.";
-                        type = lib.types.submodule { };
+                      oneshot = lib.mkOption {
+                        description = ''
+                          A command which runs to completion, and is ready once it has exited
+                          successfully.
+
+                          A oneshot has no readiness of its own beyond that. To hold dependants
+                          until something appears - a device node, say - make waiting for it the
+                          command: {option}`providers.services.lib.waitFor` gives the same waits
+                          a service's `readiness.waitFor` uses, as commands.
+                        '';
+                        # the timeout folded into the command - see oneshotCommand above
+                        apply = oneshot: oneshot // { command = oneshotCommand oneshot; };
+                        type = lib.types.submodule {
+                          options = {
+                            inherit
+                              command
+                              terminal
+                              restartIfChanged
+                              reloadTriggers
+                              startTimeout
+                              ;
+                          };
+                        };
+                      };
+
+                      shutdown = lib.mkOption {
+                        description = ''
+                          A command run once, on the way down, after every other unit has
+                          stopped.
+
+                          Not a process anything supervises: the shutdown units are lowered into
+                          a single script, in the order their {option}`requires` give, and the
+                          implementation runs that script at the one point it reliably reaches
+                          on the way down. So `requires` here means "after these, in that
+                          script", and may name only other shutdown units.
+                        '';
+                        type = lib.types.submodule {
+                          options = { inherit command; };
+                        };
                       };
                     }
                   );
@@ -916,21 +1044,21 @@ in
 
               requires = lib.mkOption {
                 type = with lib.types; listOf str;
-                # the trunk's own levels are excluded: a level derives its own requires from
-                # the chain, and defaulting it to the head would make the first level require
-                # itself
-                default = lib.optional (!(lib.elem name cfg.trunk.levels)) (lib.head cfg.trunk.levels);
-                defaultText = lib.literalExpression "[ (lib.head config.providers.services.trunk.levels) ]";
+                default = [ ];
                 description = ''
                   The units which must be ready before this one starts. Losing one afterwards
                   has no effect on this unit.
 
-                  At most one of these may be a trunk level - see
-                  {option}`providers.services.trunk.levels`.
+                  Nothing is implied: a unit which requires nothing starts as soon as the system
+                  does, alongside the filesystems being mounted. A daemon which keeps state
+                  wants `tmpfiles-setup`, which is behind the mounts; one which logs wants the
+                  system logger; one which touches hardware wants `devices-settled`. Names only
+                  some machines have - the logger, the device manager's settle, the bus - are
+                  named through {option}`providers.services.lib.present`, so the edge exists
+                  where the unit does and nowhere else.
 
-                  A unit which requires nothing is attached to the first trunk level instead of
-                  floating free, so that it still has a place in the tree and the second level
-                  still waits for it. Setting this to an empty list explicitly opts out.
+                  For a `shutdown` unit these order it among the other shutdown units, and may
+                  name nothing else.
                 '';
               };
 
@@ -969,103 +1097,6 @@ in
 
                   Units are given a deliberately bare environment, so anything invoking a
                   program by name rather than by store path needs to say where to find it.
-                '';
-              };
-
-              terminal = lib.mkOption {
-                type = lib.types.bool;
-                default = false;
-                description = ''
-                  Whether this unit's command opens a terminal itself and makes it its standard
-                  input, output and error - a getty, or a greeter run through one. An
-                  implementation must then leave the unit's output alone rather than capture it.
-
-                  Capturing is not merely pointless for such a program, it is harmful. finit's
-                  `log` forks a logger as a child of the unit's own process; the getty points its
-                  output at the terminal, the logger exits, and the unit is left holding a child
-                  it never made. `login` is then exec'd into that process, forks the shell, and
-                  waits for *any* child - reaping the logger instead, concluding the session is
-                  over, and exiting, at which point the kernel hangs up the shell before it has
-                  run a line. Every login on the machine returns straight to the prompt with
-                  nothing printed. tests/getty-login.nix pins it.
-                '';
-              };
-
-              restartIfChanged = lib.mkOption {
-                type = lib.types.bool;
-                default = true;
-                description = ''
-                  Whether a switch may stop and start this unit when its definition has changed.
-
-                  True for almost everything: a changed unit is one whose new definition is not
-                  what is running, and the point of a switch is to make the machine match the
-                  generation. Set false where applying the change costs more than leaving it
-                  pending, and the new definition then takes effect the next time the unit
-                  starts for any other reason.
-
-                  What that is for is a unit whose restart destroys something the user did not
-                  ask to lose. A display manager is the case: restarting it ends every session
-                  on the machine, so a switch which touched it would log the user out - and if
-                  the switch is being run *from* one of those sessions, it takes the rest of the
-                  switch with it. That is not hypothetical; it is how a generation comes to be
-                  activated and never recorded, because the tool driving it was killed between
-                  the two halves.
-
-                  Unrelated to being added or removed. A unit that is genuinely new is still
-                  started and one that is gone is still stopped - this says only that *changing*
-                  it is not reason enough to interrupt it.
-                '';
-              };
-
-              reloadTriggers = lib.mkOption {
-                type = with lib.types; listOf (either path str);
-                default = [ ];
-                example = lib.literalExpression "[ config.services.foo.configFile ]";
-                description = ''
-                  Files this unit's process reads which are not named anywhere else in the
-                  unit, listed so that changing one counts as changing the unit.
-
-                  A unit's identity is what {option}`providers.services.switch` compares across
-                  a rebuild: the command, the user, the environment, and the rest of what is
-                  written here. A daemon which reads a configuration file from a fixed path -
-                  `/etc/elogind/logind.conf`, say - names it nowhere, so the file can change
-                  while every one of those stays identical, and the daemon keeps running with
-                  the configuration it started with. Nothing reports it.
-
-                  Naming the file here makes it part of the unit, so the switch acts on it.
-                  What it does is reload where it can: a changed unit which declares
-                  {option}`type.service.reload` is asked to re-read its own configuration and
-                  keeps its pid, and only one which cannot is stopped and started. Hence the
-                  name - a restart is the fallback, not the intent. Whether reloading is
-                  enough is the unit's claim to make, which is why it is made there.
-
-                  Only for what the unit does not otherwise mention. A path which already
-                  appears in the command - as an argument, or in a generated script - is part
-                  of the unit by being there, and needs no second statement.
-                '';
-              };
-
-              startTimeout = lib.mkOption {
-                type = with lib.types; nullOr ints.unsigned;
-                default = null;
-                description = ''
-                  How long, in seconds, this unit may take to become ready before it is
-                  considered failed. Subject to
-                  {option}`providers.services.supportedFeatures.startTimeout`.
-                '';
-              };
-
-              stopTimeout = lib.mkOption {
-                type = with lib.types; nullOr ints.unsigned;
-                default = null;
-                description = ''
-                  How long, in seconds, this unit is given to exit after being asked to stop,
-                  before it is killed outright. Subject to
-                  {option}`providers.services.supportedFeatures.stopTimeout`.
-
-                  Implementation defaults are chosen for units which exit promptly and are
-                  usually only a few seconds. Anything which flushes state on the way out - a
-                  database especially - should say so here rather than be killed mid-write.
                 '';
               };
             };
@@ -1259,7 +1290,8 @@ in
           "providers.services.units.${name} sets a startTimeout, which the ${cfg.backend} "
           + "implementation cannot bound - a unit which never becomes ready will stall "
           + "everything requiring it."
-        ) (lib.filterAttrs (_: u: u.startTimeout != null) cfg.units)
+          # services only: a oneshot's start timeout is enforced by the contract itself
+        ) (lib.filterAttrs (_: u: (serviceOf u).startTimeout or null != null) cfg.units)
       )
       ++ lib.optionals (cfg.backend != "none" && !cfg.supportedFeatures.stopTimeout) (
         lib.mapAttrsToList (
@@ -1267,7 +1299,7 @@ in
           "providers.services.units.${name} sets a stopTimeout, which the ${cfg.backend} "
           + "implementation cannot bound - it will be killed on whatever schedule that "
           + "implementation uses."
-        ) (lib.filterAttrs (_: u: u.stopTimeout != null) cfg.units)
+        ) (lib.filterAttrs (_: u: (serviceOf u).stopTimeout or null != null) cfg.units)
       )
       # every capability a unit asks for and the implementation cannot provide is reported here
       # rather than refused. The configuration still says what it meant, and the warning says
@@ -1338,20 +1370,36 @@ in
       )
     ]
 
+    # the two sides of the graph never meet. A shutdown unit's edges order the shutdown script,
+    # which runs once everything else has stopped, so an edge from one to a boot unit names
+    # something long gone; and a boot unit waiting on a shutdown unit waits for something that
+    # only happens on the way down, which is forever.
     ++ lib.mapAttrsToList (
       name: unit:
       let
-        attached = lib.filter (dep: lib.elem dep cfg.trunk.levels) unit.requires;
+        mine = shutdownLib.isShutdown unit;
+        crossing = lib.filter (
+          dep: cfg.units ? ${dep} && shutdownLib.isShutdown cfg.units.${dep} != mine
+        ) unit.requires;
       in
       {
-        assertion = lib.length attached < 2;
-        message = ''
-          providers.services.units.${name} requires more than one trunk level: ${lib.concatStringsSep ", " attached}
-          A unit attaches to exactly one level. Requiring two also makes the later level require
-          this unit, by way of the earlier one, which is a cycle.
-        '';
+        assertion = crossing == [ ];
+        message =
+          if mine then
+            ''
+              providers.services.units.${name} is a shutdown unit, and requires units which are
+              not: ${lib.concatStringsSep ", " crossing}
+
+              A shutdown unit runs after every other unit has stopped, so its `requires` order
+              it among the other shutdown units and can name nothing else.
+            ''
+          else
+            ''
+              providers.services.units.${name} requires shutdown units, which only run on the
+              way down: ${lib.concatStringsSep ", " crossing}
+            '';
       }
-    ) (lib.filterAttrs (name: _: !(lib.elem name cfg.trunk.levels)) cfg.units)
+    ) cfg.units
 
     # a readiness kind the implementation cannot observe is refused rather than warned about,
     # which is what supportedFeatures.readiness has always said would happen. Every other

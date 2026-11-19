@@ -31,17 +31,14 @@ in
       };
     };
 
-    # greetd waits for the greeter's own daemon, and for whatever manages seats and sessions on
-    # this machine. These were `finit.services.greetd.conditions`, which reached finit alone -
-    # on any other implementation greetd started whenever it liked, and a greeter with no bus
-    # daemon behind it is a login prompt which cannot log anybody in.
+    # greetd waits for the greeter's own daemon. These were `finit.services.greetd.conditions`,
+    # which reached finit alone - on any other implementation greetd started whenever it liked,
+    # and a greeter with no bus daemon behind it is a login prompt which cannot log anybody in.
+    # The seat and session managers it also waits for are named by greetd's own unit.
     providers.services.units.greetd.requires = [
       "accounts-daemon"
       "cosmic-greeter-daemon"
-    ]
-    ++ lib.optional config.services.sessiond.enable "sessiond"
-    ++ lib.optional config.services.elogind.enable "elogind"
-    ++ lib.optional config.services.seatd.enable "seatd";
+    ];
 
     providers.services.tmpfiles.rules = [
       {

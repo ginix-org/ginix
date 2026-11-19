@@ -21,18 +21,7 @@ const POLL: Duration = Duration::from_millis(100);
 /// A job writes its fingerprint the moment it starts, whether or not it has reached readiness -
 /// "active" here means "a job for this generation's definition has been launched", which is the
 /// same standard `fork` readiness already treats as good enough on this backend.
-///
-/// The shutdown side is reported as already matching whatever this generation says it should be.
-/// It is never started by anything here - it runs once, on the way down - so reporting nothing
-/// would leave it in the incoming tree forever, and every switch would resolve to "start the
-/// shutdown side" for units that can only ever run at the very end.
 pub fn list(manifest: &Manifest) -> ExitCode {
-    for (name, unit) in &manifest.units {
-        if unit.shutdown_side {
-            println!("{name}\t{}", unit.fingerprint);
-        }
-    }
-
     let latches = Latches::new(&manifest.latch_dir);
     for name in latches.with_suffix(".fingerprint") {
         if let Ok(fingerprint) = std::fs::read_to_string(latches.fingerprint(&name)) {
@@ -45,9 +34,8 @@ pub fn list(manifest: &Manifest) -> ExitCode {
 
 /// Start each unit named on stdin.
 ///
-/// A name which is not a boot-side unit of this generation is the shutdown side, or something
-/// this generation no longer has. Neither is something to start, so it is skipped rather than
-/// failing the whole batch.
+/// A name which is not a unit of this generation is something it no longer has, which is not
+/// something to start, so it is skipped rather than failing the whole batch.
 ///
 /// The stop file is cleared here and not by `deactivate` once the process it names is gone:
 /// confirming that and removing the file are two different processes racing each other, and
@@ -67,9 +55,8 @@ pub fn activate(manifest: &Manifest, manifest_path: &str) -> ExitCode {
     };
 
     for name in names_on_stdin() {
-        match manifest.units.get(&name) {
-            Some(unit) if !unit.shutdown_side => {}
-            _ => continue,
+        if !manifest.units.contains_key(&name) {
+            continue;
         }
 
         let _ = std::fs::remove_file(latches.stop(&name));
@@ -94,7 +81,7 @@ pub fn activate(manifest: &Manifest, manifest_path: &str) -> ExitCode {
 ///
 /// It is deliberately never removed here. See `activate`, which is where clearing it is safe.
 ///
-/// An anchor or oneshot has no pidfile, never having been supervised, so there is nothing to
+/// A oneshot has no pidfile, never having been supervised, so there is nothing to
 /// signal - only its latch and fingerprint to take back.
 pub fn deactivate(manifest: &Manifest) -> ExitCode {
     let latches = Latches::new(&manifest.latch_dir);

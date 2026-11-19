@@ -20,7 +20,7 @@ in
       inherit (cfg) user group;
 
       description = "NVIDIA persistence daemon";
-      requires = [ "basic" ];
+      requires = [ "tmpfiles-setup" ] ++ config.providers.services.lib.present [ "syslogd" ];
 
       type.service = {
         command = "${lib.getExe cfg.package} " + lib.escapeShellArgs cfg.extraArgs;
@@ -36,9 +36,7 @@ in
 
     providers.services.units.nvidia-persistenced-cleanup = {
       description = "clear the NVIDIA persistence daemon's runtime directory";
-      requires = [ "stopped" ];
-
-      type.oneshot.command = pkgs.writeShellScript "nvidia-persistenced-cleanup" ''
+      type.shutdown.command = pkgs.writeShellScript "nvidia-persistenced-cleanup" ''
         ${lib.getExe pkgs.findutils} ${runtimeDir} -mindepth 1 -delete
       '';
     };

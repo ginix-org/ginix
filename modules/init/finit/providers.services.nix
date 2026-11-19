@@ -6,7 +6,6 @@
 }:
 let
   cfg = config.providers.services;
-  trunk = cfg.trunk;
 
   tmpfilesReader = "${config.finit.package}/libexec/finit/tmpfiles";
 
@@ -24,53 +23,15 @@ let
   # deliberately not S. finit's own bootstrap wait (sm_check_bootstrap in src/sm.c) blocks
   # entering the configured runlevel until every `task`/`run` stanza valid in S has completed,
   # which is a second synchronization barrier the graph did not ask for: it would make finit's
-  # own "entering runlevel N" wait on whichever trunk-attached task happens to be slowest -
+  # own "entering runlevel N" wait on whichever early task happens to be slowest -
   # `network-online`'s five second timeout, for instance - rather than on nothing at all. The
   # graph already carries every ordering constraint that matters via `conditions`, so nothing
   # here needs runlevel S to mean anything; landing in the configured runlevel as fast as finit
   # can manage and letting the graph take it from there is the point.
-  #
-  # shutdown-side stanzas sit in exactly 0 and 6, which is the only vocabulary finit has for
-  # "on the way out".
   bootRunlevels = "12345789";
-  shutdownRunlevels = "06";
 
-  indexOf =
-    name:
-    lib.findFirst (i: i != null) null (lib.imap0 (i: l: if l == name then i else null) trunk.levels);
-
-  latchIndex = indexOf trunk.latch;
-
-  # a unit is on the shutdown side if it is a trunk level at or after the latch, or if it
-  # attached itself to one. attaching to more than one level is refused by the contract, so
-  # the first match is the only match.
-  levelFor =
-    name: unit:
-    if lib.elem name trunk.levels then
-      name
-    else
-      lib.findFirst (dep: lib.elem dep trunk.levels) null unit.requires;
-
-  onShutdownSide =
-    name: unit:
-    let
-      level = levelFor name unit;
-    in
-    latchIndex != null && level != null && indexOf level >= latchIndex;
-
-  runlevelsFor = name: unit: if onShutdownSide name unit then shutdownRunlevels else bootRunlevels;
-
-  # where a unit sits in the trunk, as a number. this orders the steps of the generated
-  # shutdown script below; finit itself never sees it.
-  priorityFor =
-    name: unit:
-    let
-      i = indexOf (levelFor name unit);
-    in
-    if lib.elem name trunk.levels then i * 100 else i * 100 + 50;
-
-  # finit has no process-less stanza, so an anchor is a task running `true`. `remain` stops it
-  # re-running, and its `task/<name>/success` condition then holds for the rest of the runlevel.
+  # what a companion runs when there is nothing to wait for, and what a chain link runs. `remain`
+  # stops it re-running, and its `task/<name>/success` then holds for the rest of the runlevel.
   true' = lib.getExe' config.programs.coreutils.package "true";
 
   # every finit condition is live. `service/<n>/ready` de-asserts when the service stops, and
@@ -82,9 +43,9 @@ let
   # this works because a companion's own success does not retract when the condition which
   # triggered it goes away - tests/providers/services.nix pins exactly that.
   #
-  # every unit gets one, not only services. an anchor or oneshot depended upon directly would
-  # drop its condition when restarted, and the switch engine restarts an anchor whenever a new
-  # service attaches to its trunk level - which would otherwise stop everything hanging off it.
+  # every unit gets one, not only services. a oneshot depended upon directly would drop its
+  # condition when restarted - by a switch which changed it, say - which would otherwise stop
+  # everything hanging off it.
   companionOf = name: "${name}-started";
 
   conditionOf = name: "task/${companionOf name}/success";
@@ -103,13 +64,13 @@ let
   # the excess. The ordering then quietly does not exist: the unit starts immediately and
   # whatever it required is still coming up.
   #
-  # A trunk level requires the level before it and everything attached to that level, so a tier
-  # of seven units exceeds this on its own - every entry costs `task/<name>-started/success`,
+  # A unit which waits for a dozen others - the early units a daemon names, its bus, its own
+  # helpers - exceeds this quickly: every entry costs `task/<name>-started/success`,
   # twenty-two characters before the name.
   #
   # So a list which does not fit becomes a chain. Each link waits for a few of the conditions
   # and for the link before it, and the unit waits only for the last - which means the same
-  # thing and fits, however wide the tier. A link is a task running `true` with `remain`, so its
+  # thing and fits, however many there are. A link is a task running `true` with `remain`, so its
   # success holds for the rest of the runlevel, exactly as a companion's does.
   condLimit = 192;
 
@@ -157,7 +118,7 @@ let
             i: chunk:
             lib.nameValuePair (linkName name i) {
               description = "${name} prerequisites, part ${toString (i + 1)} of ${toString (last + 1)}";
-              runlevel = runlevelsFor name unit;
+              runlevel = bootRunlevels;
               command = true';
               remain-after-exit = true;
               conditions = chunk ++ lib.optional (i > 0) (taskCondition (linkName name (i - 1)));
@@ -171,7 +132,7 @@ let
     {
       inherit (unit) description;
 
-      runlevel = runlevelsFor name unit;
+      runlevel = bootRunlevels;
       conditions = (chainFor name unit).conditions;
       environment = unit.environment;
 
@@ -190,13 +151,13 @@ let
       # inference from the outside or by running the command by hand.
       #
       # `log` is finit's own answer, implemented with logit, and this is the behaviour every
-      # other init gives by default. Applied to companions and anchors as well, which run `true`
+      # other init gives by default. Applied to companions as well, which run `true`
       # and have nothing to say - there is no reason to make the rule conditional.
       #
       # Except for a unit which takes the terminal for its own output, where `logit` is worse
       # than useless: it is a child of the unit's process, which `login` later inherits and
       # mistakes for the shell. See `terminal` in the contract.
-      log = if unit.terminal then null else { };
+      log = if (variantOf unit).terminal or false then null else { };
 
       # finit notices a changed unit by its stanza file changing, so stamping each unit's
       # fingerprint into its own file guarantees the file differs whenever the unit's definition
@@ -260,13 +221,13 @@ let
       type = "forking";
       pidfile = svc.readiness.waitFor.pidfile.file;
     }
-    // lib.optionalAttrs (unit.stopTimeout != null) { stop-timeout = unit.stopTimeout; };
+    // lib.optionalAttrs (svc.stopTimeout != null) { stop-timeout = svc.stopTimeout; };
 
   mkTask =
     name: unit:
     common name unit
     // {
-      command = if kindOf unit == "anchor" then true' else (variantOf unit).command;
+      command = (variantOf unit).command;
       remain-after-exit = true;
     };
 
@@ -300,7 +261,7 @@ let
     {
       description = "${name} has started";
 
-      runlevel = runlevelsFor name unit;
+      runlevel = bootRunlevels;
       conditions = [ (readyConditionOf name) ];
       command = if wait == null || waitKindOf' unit == "pidfile" then true' else wait;
       remain-after-exit = true;
@@ -308,10 +269,7 @@ let
 
   isService = _: unit: kindOf unit == "service";
 
-  enabled = lib.filterAttrs (_: u: u.enable) cfg.units;
-
-  bootSide = lib.filterAttrs (name: unit: !(onShutdownSide name unit)) enabled;
-  shutdownSide = lib.filterAttrs onShutdownSide enabled;
+  bootSide = shutdownLib.bootSideOf cfg.units;
 
   services = lib.filterAttrs isService bootSide;
 in
@@ -477,7 +435,7 @@ in
         // lib.mapAttrs' (name: unit: lib.nameValuePair (companionOf name) (mkCompanion name unit)) bootSide
 
         # the chain links, for any unit whose condition list finit would otherwise refuse. Most
-        # units have none; a wide trunk level has a few.
+        # units have none; one waiting on a great many others has a few.
         // lib.foldl (acc: name: acc // (chainFor name bootSide.${name}).links) { } (lib.attrNames bootSide)
         # the tmpfiles.d(5) rules only finit can read. Named apart from the contract's own
         # `tmpfiles-setup` unit, which finit also emits as a stanza - two stanzas of one name
@@ -505,9 +463,8 @@ in
         };
       };
 
-      # on the script rather than on shutdownSide being non-empty: the levels at and after the
-      # latch are themselves shutdown-side units, so that set is never empty, while a machine
-      # whose shutdown side is only those anchors has nothing to run and gets no script.
+      # the shutdown units, as the one script finit runs on the way down - null when there are
+      # none, and then there is no hook at all.
       environment.etc = lib.optionalAttrs (shutdownScript != null) {
         "finit/hook/sys/shutdown/providers-services-shutdown".source = shutdownScript;
       };
@@ -538,7 +495,7 @@ in
               else
                 printf '%s\tstopped\n' ${lib.escapeShellArg name}
               fi
-            '') (lib.filterAttrs (_: u: u.enable) cfg.units)
+            '') bootSide
           )
         )
       );

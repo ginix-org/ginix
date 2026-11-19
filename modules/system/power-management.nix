@@ -31,13 +31,13 @@ in
   };
 
   config = lib.mkIf (cfg.cpuFreqGovernor != null) {
-    # A oneshot rather than a service: it writes and finishes. sysinit, because the governor is
-    # a property of the machine rather than of anything running on it, and the sooner it is set
-    # the less of boot runs under the wrong one.
+    # A oneshot rather than a service: it writes and finishes. Requiring nothing, because the
+    # governor is a property of the machine rather than of anything running on it, and the
+    # sooner it is set the less of boot runs under the wrong one.
     providers.services.units.cpufreq-governor = {
       description = "select the cpu frequency governor";
 
-      requires = [ "sysinit" ];
+      requires = [ ];
 
       type.oneshot.command = toString (
         pkgs.writeShellScript "cpufreq-governor" ''

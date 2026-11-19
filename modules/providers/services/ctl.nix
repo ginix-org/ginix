@@ -25,7 +25,8 @@ let
   cfg = config.providers.services;
   sw = cfg.switch;
 
-  enabled = lib.filterAttrs (_: u: u.enable) cfg.units;
+  # the units there is anything to control: a shutdown unit is a step in a script, not a process
+  enabled = (import ./shutdown.nix { inherit pkgs lib; }).bootSideOf cfg.units;
   userTrees = lib.filterAttrs (_: t: t.units != { }) cfg.users;
 
   # whether there is anything to control: the system tree needs the three operations, and a

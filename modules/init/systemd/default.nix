@@ -29,10 +29,7 @@
 }:
 let
   cfg = config.providers.services;
-  trunk = cfg.trunk;
   scfg = config.systemd;
-
-  enabled = lib.filterAttrs (_: u: u.enable) cfg.units;
 
   kindOf = unit: lib.head (lib.attrNames unit.type);
   variantOf = unit: unit.type.${kindOf unit};
@@ -48,10 +45,9 @@ let
   readinessLib = import ../../providers/services/readiness.nix { inherit pkgs lib; };
   shutdownLib = import ../../providers/services/shutdown.nix { inherit pkgs lib; };
 
-  onShutdownSide = shutdownLib.onShutdownSide trunk;
-  bootSide = lib.filterAttrs (n: u: !(onShutdownSide n u)) enabled;
+  bootSide = shutdownLib.bootSideOf cfg.units;
 
-  # the whole shutdown side as one script, in trunk order. The contract lowers it here for
+  # the shutdown units as one script, in dependency order. The contract lowers it here for
   # every backend because no init orders it reliably - see providers/services/shutdown.nix.
   #
   # systemd is the one init that could have ordered it itself, through units with
@@ -62,32 +58,30 @@ let
 
   # ---- naming ------------------------------------------------------------------------
   #
-  # Everything is prefixed, and it is not cosmetic. The trunk's default levels are `start
-  # sysinit basic multi-user running stopped shutdown`, and four of those are systemd special
-  # targets: an anchor rendered as `sysinit.target` or `basic.target` would shadow systemd's
-  # own, and one rendered as `shutdown.target` would shadow the unit systemd isolates to on the
-  # way down - which is `RefuseManualStart=yes` for the reason that implies. trunk.nix warns
-  # about exactly this for dinit's `boot`.
+  # Everything is prefixed, and it is not cosmetic. A unit name is the configuration's to
+  # choose, and systemd ships units of its own under names a configuration could easily pick:
+  # a unit called `rescue` or `emergency` rendered unprefixed would replace the service systemd
+  # lands a failed boot in, and the machine would have nowhere to go when it needed one.
   #
   # Prefixing only the colliding names was the other option. It makes a unit's name in the
   # backend unpredictable from its name in the configuration, and it leaves the collision
-  # waiting for whoever first declares a unit called `rescue`. Uniform is also what makes
-  # `finix-*` a usable glob, which is how `ctl.status` and `switch.list` below scope themselves
-  # to our units rather than reporting systemd's forty internal ones.
+  # waiting for whoever first declares the next one. Uniform is also what makes `finix-*` a
+  # usable glob, which is how `ctl.status` and `switch.list` below scope themselves to our units
+  # rather than reporting systemd's forty internal ones.
   prefix = "finix-";
 
-  suffixOf = unit: if kindOf unit == "anchor" then "target" else "service";
-  unitOf = name: unit: "${prefix}${name}.${suffixOf unit}";
+  # every unit is a `.service`: a oneshot is `Type=oneshot`, and there is no kind without a
+  # process to be anything else
+  unitOf = name: _: "${prefix}${name}.service";
 
   # an edge, resolved against the scope the unit lives in. Scoped rather than always against
-  # `enabled` because a user's tree is a graph of its own and its units are not in `enabled` at
+  # `bootSide` because a user's tree is a graph of its own and its units are not in `bootSide` at
   # all - the same trap the dinit backend documents at `edgeIn`.
   unitIn =
     scope: name: if scope ? ${name} then unitOf name scope.${name} else "${prefix}${name}.service";
 
   rootTarget = "${prefix}default.target";
   latchService = "${prefix}shutdown.service";
-  firstLevel = lib.head trunk.levels;
 
   # ---- rendering ---------------------------------------------------------------------
 
@@ -122,12 +116,7 @@ let
   # *explicitly* stopped does propagate.
   depsOf =
     scope: name: unit:
-    map (unitIn scope) unit.requires
-
-    # the latch, hung where dinit hangs it and for the same reason. It has to stop after
-    # everything else, stop order is the reverse of start order, so it has to start before
-    # everything else - and the first trunk level is what everything is transitively behind.
-    ++ lib.optional (name == firstLevel && shutdownScript != null) latchService;
+    map (unitIn scope) unit.requires;
 
   unitSection =
     scope: name: unit:
@@ -215,7 +204,7 @@ let
         # `Restart=always` takes the unit through failed/inactive on its way back up, and that
         # transition is a restart as far as propagation is concerned - so every unit requiring
         # this one is restarted too. Measured, not reasoned about: killing a daemon tore down
-        # the trunk level above it and restarted two unrelated services behind that.
+        # the unit waiting on it and restarted two unrelated services behind that.
         #
         # systemd.service(5) on `direct`: "the service transitions to the activating state
         # directly during auto-restart, skipping failed/inactive state ... Dependent units are
@@ -239,8 +228,12 @@ let
       # wrapper to get a per-unit PATH; systemd has the directive.
       ++ lib.optional (unit.path != [ ]) "Environment=${envValue "PATH=${lib.makeBinPath unit.path}"}"
       ++ lib.mapAttrsToList (k: v': "Environment=${envValue "${k}=${toString v'}"}") unit.environment
-      ++ lib.optional (unit.startTimeout != null) "TimeoutStartSec=${toString unit.startTimeout}"
-      ++ lib.optional (unit.stopTimeout != null) "TimeoutStopSec=${toString unit.stopTimeout}"
+      # always said, because systemd's own default is ninety seconds and an unset `startTimeout`
+      # is no bound at all, the same as on every other implementation
+      ++ [
+        "TimeoutStartSec=${if v.startTimeout or null == null then "infinity" else toString v.startTimeout}"
+      ]
+      ++ lib.optional (v.stopTimeout or null != null) "TimeoutStopSec=${toString v.stopTimeout}"
 
       # where a unit's own account of itself goes, which has to be said because the usual answer
       # is not here.
@@ -260,22 +253,28 @@ let
 
   renderUnit =
     scope: name: unit:
-    unitSection scope name unit
-    + lib.optionalString (kindOf unit != "anchor") ("\n" + serviceSection name unit);
+    unitSection scope name unit + "\n" + serviceSection name unit;
 
-  # the latch: a unit which does nothing on the way up and runs the shutdown side on the way
+  # the roots of the system's graph, which the latch is ordered before. It has to stop after
+  # everything else, stop order is the reverse of start order, and every unit is transitively
+  # behind some root - so ordering it before each root orders it before everything. Said on the
+  # latch rather than on the roots, so that rendering a unit does not have to know which tree
+  # it is in: a user's tree is not pid 1's to order.
+  roots = lib.mapAttrsToList unitOf (lib.filterAttrs (_: u: u.requires == [ ]) bootSide);
+
+  # the latch: a unit which does nothing on the way up and runs the shutdown units on the way
   # down. `ExecStop=` rather than a unit per step, because the script is already ordered.
   #
   # `DefaultDependencies=no` with an explicit `Before=`/`Conflicts=shutdown.target` is the
   # documented shape for something that must run during shutdown. With the default dependencies
-  # it would also be ordered `After=basic.target`, and so stopped before the units attached to
-  # the trunk rather than after them.
+  # it would also be ordered `After=basic.target`, and so stopped before the units it has to
+  # outlast rather than after them.
   latchText = ''
     [Unit]
     Description=finix shutdown sequence
     DefaultDependencies=no
     Conflicts=shutdown.target
-    Before=shutdown.target
+    Before=shutdown.target ${lib.concatStringsSep " " roots}
 
     [Service]
     Type=oneshot
@@ -430,7 +429,7 @@ let
   # so the socket is ordered before the bus for free. Saying `After=${busAlias}` as well is
   # both halves of the problem that produced the stub: it is a cycle, which systemd resolves by
   # deleting a job from it ("Job finix-dbus.service/start deleted to break ordering cycle
-  # starting with dbus.socket/start", the bus never starting and the trunk never completing),
+  # starting with dbus.socket/start", the bus never starting and nothing behind it either),
   # and it starts the socket after the bus, which systemd refuses outright - "Socket service %s
   # already active, refusing", `socket_start` declining a socket whose service is up. Starting
   # before the bus is the order that avoids both, and is the order real dbus.socket runs in.
@@ -1205,7 +1204,7 @@ in
         user: _:
         lib.nameValuePair (runtimeDirUnit user) {
           description = "runtime directory for ${user}";
-          requires = [ "sysinit" ];
+          requires = [ "tmpfiles-setup" ];
           type.oneshot.command = pkgs.writeShellScript "user-runtime-dir-${user}" ''
             uid=$(${lib.getExe' pkgs.coreutils "id"} -u ${lib.escapeShellArg user}) || exit 1
             ${lib.getExe' pkgs.coreutils "mkdir"} -p /run/user/"$uid"

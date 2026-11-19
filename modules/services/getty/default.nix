@@ -1,6 +1,5 @@
 {
   config,
-  options,
   pkgs,
   lib,
   ...
@@ -9,9 +8,18 @@ let
   cfg = config.services.getty;
   # ESC byte via JSON's \u escape
   esc = builtins.fromJSON ''"\u001b"'';
+
+  loginLib = import ./login.nix { inherit pkgs lib; };
+
+  # a getty's argument syntax: a function, or the name of one login.nix provides
+  argsType =
+    with lib.types;
+    coercedTo (enum (lib.attrNames loginLib.args)) (name: loginLib.args.${name}) (
+      functionTo (listOf str)
+    );
 in
 {
-  imports = [ ./providers.ttys.nix ];
+  imports = [ ./providers.services.nix ];
 
   options.services.getty = {
     enable = lib.mkOption {
@@ -36,12 +44,15 @@ in
     };
 
     args = lib.mkOption {
-      inherit (options.providers.ttys.args) type;
+      type = argsType;
       default = "agetty";
       description = ''
-        How {option}`services.getty.package` is invoked, as {option}`providers.ttys.args`:
-        `"agetty"`, `"busybox"`, or a function. It has to match the package - a busybox
-        `getty` handed agetty's flags refuses them and respawns forever.
+        How {option}`services.getty.package` is invoked: `"agetty"`, `"busybox"`, or a function
+        from `{ device, login, autologin, extraArgs }` to its argument list. It has to match the
+        package - a busybox `getty` handed agetty's flags refuses them and respawns forever.
+
+        `autologin` is a user name or `null`; a getty which cannot log anyone in without a prompt
+        should throw when it is set.
       '';
       example = lib.literalExpression ''
         {
@@ -71,6 +82,13 @@ in
       ];
       description = ''
         The list of tty devices on which to start a login prompt.
+
+        Each is the unit `tty-<device>`, and that name is how a terminal is claimed. The prompt's
+        command, description and `requires` are set at `mkDefault`, so a display manager or an
+        autologin which wants the same device defines `tty-<device>` with its own command and
+        wins; two of them wanting one device is a merge conflict which names both. Anything
+        which runs on a terminal should use the same name, whether or not this module is
+        enabled, or it will hold the device at the same time as a getty does.
       '';
     };
 
@@ -84,7 +102,7 @@ in
         The terminal is claimed the way anything else claims one: by defining it, at normal
         priority, over the `mkDefault` prompt this module offers on every tty in the list. A
         display manager which wants that same terminal still wins in the ordinary way, by
-        saying so - this is not a special case in the provider.
+        saying so - nothing about it is special.
 
         Anyone who can open the lid gets that user's session. That is what it is for, and it
         is the whole of the security model around it: set it only where physical access to the

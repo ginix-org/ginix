@@ -17,10 +17,10 @@ in
     providers.services.units.zram-swap = {
       description = "zram swap (${toString cfg.memoryPercent}% RAM, ${cfg.algorithm})";
 
-      # swap belongs early, before the tier which completes `basic`. `task/modprobe/success`
-      # named a finit task of finit's own; the module is always present, so what this actually
+      # swap belongs early, so it requires nothing. `task/modprobe/success` named a finit task
+      # of finit's own; the module is always present, so what this actually
       # waits on is the kernel module being loadable, which `zramctl` does for itself.
-      requires = [ "sysinit" ];
+      requires = [ ];
 
       path = [
         pkgs.coreutils

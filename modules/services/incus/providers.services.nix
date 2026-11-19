@@ -17,12 +17,18 @@ in
     providers.services.units.incusd = {
       description = "incus container hypervisor";
 
-      # the logger is behind the tier which completes `basic`
-      requires = [ "basic" ];
+      # the logger, and the firewall where there is one: a hypervisor brings up bridges
+      requires = [
+        "tmpfiles-setup"
+      ]
+      ++ config.providers.services.lib.present [
+        "syslogd"
+        "nftables"
+      ];
 
       # a hypervisor being asked to stop has guests to stop first, and 30 seconds was finit's
       # figure for it
-      stopTimeout = 30;
+      type.service.stopTimeout = 30;
 
       type.service.command = pkgs.writeShellApplication {
         name = "incusd";

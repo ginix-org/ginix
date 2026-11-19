@@ -1,8 +1,8 @@
 # a service which opens a terminal actually owns it
 #
-# `providers.ttys` lowers every device to an ordinary supervised process - `agetty`, started the
-# same way any other daemon is - on the understanding that `agetty` is entirely capable of
-# claiming its own controlling terminal once it is a session leader with none yet. Whether it
+# A terminal is an ordinary supervised process - `agetty`, started the same way any other daemon
+# is - on the understanding that `agetty` is entirely capable of claiming its own controlling
+# terminal once it is a session leader with none yet. Whether it
 # gets to be one is the supervisor's problem, not the contract's, and it turned out three of the
 # four solve it without being asked: finit and dinit call `setsid()` unconditionally before
 # exec, and s6-supervise passes `CSPAWN_FLAGS_SETSID` to every service it spawns. runit's

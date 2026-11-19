@@ -43,7 +43,7 @@ in
         # is a unit too.
         subject = {
           type.service.command = coreLib.daemon "subject";
-          requires = [ "sysinit" ];
+          requires = [ "tmpfiles-setup" ];
         };
       };
     };

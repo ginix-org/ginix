@@ -12,9 +12,9 @@
 # protocol: a service is started when its `start` returns, so every `waitFor` kind is a poll in
 # `start_post`, and `notify`/`s6` are refused rather than pretended at.
 #
-# Runlevels are deliberately unused. OpenRC has them and the contract has a trunk, and the two
-# say different things: a runlevel is a set a machine is in, a trunk level is a unit others
-# wait for. Everything goes in `default` and the ordering comes from `need`, which is the
+# Runlevels are deliberately unused. OpenRC has them and the contract has a graph, and the two
+# say different things: a runlevel is a set a machine is in, an edge is a unit another
+# waits for. Everything goes in `default` and the ordering comes from `need`, which is the
 # contract's own graph rather than a second one beside it.
 {
   config,
@@ -24,7 +24,6 @@
 }:
 let
   cfg = config.providers.services;
-  enabled = lib.filterAttrs (_: u: u.enable) cfg.units;
 
   kindOf = unit: lib.head (lib.attrNames unit.type);
   variantOf = unit: unit.type.${kindOf unit};
@@ -35,32 +34,18 @@ let
 
   shutdownLib = import ../../providers/services/shutdown.nix { inherit pkgs lib; };
 
-  bootSide = lib.filterAttrs (name: unit: !(shutdownLib.onShutdownSide cfg.trunk name unit)) enabled;
-  shutdownSide = lib.filterAttrs (name: unit: shutdownLib.onShutdownSide cfg.trunk name unit) enabled;
+  bootSide = shutdownLib.bootSideOf cfg.units;
 
-  # the shutdown side is part of the generation but not part of the runlevel: a service in
-  # `default` is one openrc starts at boot, which is the one thing a unit on this side must
-  # never do. It is lowered to a single script instead, in trunk order, and handed to the one
+  # a shutdown unit is part of the generation but not part of the runlevel: a service in
+  # `default` is one openrc starts at boot, which is the one thing a shutdown unit must never
+  # do. They are lowered to a single script instead, in dependency order, and handed to the one
   # point openrc reaches reliably on the way down.
   #
   # That point is the `shutdown` runlevel. openrc-init runs `openrc shutdown` before it sends
   # the final TERM, and changing runlevel stops what the old one held before starting what the
   # new one does - so by the time this runs, everything it is supposed to come after has
-  # stopped. Which is exactly what the latch means.
+  # stopped. Which is exactly what a shutdown unit is promised.
   shutdownScript = shutdownLib.scriptFor cfg;
-
-  # `list` reports the shutdown side anyway, with the fingerprint this generation was built
-  # from. It is not running - it never is, until the machine goes down - but it is also not
-  # something the engine can start. Reporting nothing leaves it in the incoming tree and out of
-  # the current one, so every switch resolves to "start the shutdown side", forever, against
-  # services which are not in /etc/init.d at all: `starting: ... stopped ifupdown-ng-down
-  # shutdown` on a switch that changed none of them. Reported as already matching, the engine
-  # correctly finds nothing to do.
-  reportShutdownSide = lib.concatStrings (
-    lib.mapAttrsToList (
-      name: _: "printf '%s\\t%s\\n' ${name} ${lib.escapeShellArg cfg.switch.fingerprints.${name}}\n"
-    ) shutdownSide
-  );
 
   openrc = config.openrc.package;
 
@@ -82,8 +67,8 @@ let
   # which is what `need` says. `after` is ordering without a requirement, so a unit whose
   # dependency failed would start regardless.
   #
-  # An edge naming a unit this backend does not emit - the shutdown side - would make openrc
-  # refuse the service outright, so those are dropped rather than left dangling.
+  # An edge naming a unit this backend does not emit would make openrc refuse the service
+  # outright, so those are dropped rather than left dangling.
   dependsOf =
     unit:
     let
@@ -93,7 +78,7 @@ let
       # `:` rather than nothing. gendepends builds the dependency tree by sourcing each
       # runscript, and a shell function with an empty body is a syntax error - so a unit which
       # requires nothing would fail to source, drop out of the tree, and take down everything
-      # that named it. The trunk's first level is exactly that unit, so the whole graph went
+      # that named it. The early units are exactly those, so the whole graph went
       # with it: "backdoor needs service(s) start", and the same for all 29.
       ":"
     else
@@ -115,8 +100,8 @@ let
   # Returning non-zero there marks the service failed, which is the honest answer: it is
   # running and has not become ready, and whatever required it must not start.
   #
-  # Only a service has readiness at all - a oneshot is ready once it has exited, an anchor once
-  # what it requires is - so this is asked of nothing else.
+  # Only a service has readiness at all - a oneshot is ready once it has exited - so this is
+  # asked of nothing else.
   waitForBlock =
     name: unit:
     let
@@ -154,19 +139,7 @@ let
         ${environmentOf unit}
       ''
       + (
-        if kind == "anchor" then
-          ''
-            # an anchor has no process: it is a name which becomes ready once the units it
-            # requires are, which `need` above has already said.
-            start() {
-              return 0
-            }
-
-            stop() {
-              return 0
-            }
-          ''
-        else if kind == "oneshot" then
+        if kind == "oneshot" then
           ''
             # openrc marks a service started when `start` returns successfully, which is what a
             # oneshot means: it has run, and whatever waited for it may go.
@@ -213,13 +186,13 @@ let
     ''
   );
 
-  # not a unit, and deliberately not named like one: the whole shutdown side is one script, and
+  # not a unit, and deliberately not named like one: the shutdown units are one script, and
   # this is the runscript which carries it into the `shutdown` runlevel. It has no `depend` -
   # there is nothing left to depend on by the time it runs.
   shutdownRunscript = pkgs.writeScript "openrc-providers-services-shutdown" ''
     #!${openrc}/bin/openrc-run
 
-    description='the shutdown side of the trunk, in order'
+    description='the shutdown units, in order'
 
     depend() {
       :
@@ -374,6 +347,19 @@ in
       environment.etc."init.d".source = initd;
       environment.etc."runlevels".source = runlevels;
 
+      # services started together, as the contract's graph says: a unit starts once what it
+      # requires is ready, and is not held behind a unit it has nothing to do with.
+      #
+      # openrc's default is one service at a time, in dependency order - which is the same
+      # ordering only for units that never wait. A oneshot whose command is a wait, holding its
+      # dependants until a device or a file appears, held up everything after it in openrc's
+      # sequence instead, including the unit which was going to make the file: openrc never got
+      # to start it, so the wait ran to its timeout every time. tests/providers/core/readiness
+      # is that case.
+      environment.etc."rc.conf".text = ''
+        rc_parallel="YES"
+      '';
+
       environment.systemPackages = [ openrc ];
 
       # openrc records what it has started as files under /run/openrc/started, which is what
@@ -394,7 +380,7 @@ in
               else
                 printf '%s\tstopped\n' ${lib.escapeShellArg name}
               fi
-            '') (lib.filterAttrs (_: u: u.enable) cfg.units)
+            '') bootSide
           )
         )
       );
@@ -416,7 +402,6 @@ in
             ]
           }:$PATH
 
-          ${reportShutdownSide}
           [ -d /run/openrc/started ] || exit 0
 
           for path in /run/openrc/started/*; do

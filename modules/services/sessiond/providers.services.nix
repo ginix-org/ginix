@@ -17,13 +17,15 @@ in
     providers.services.units.sessiond = {
       description = "Session management daemon";
 
-      # `sysinit`, beside seatd and elogind: a session manager is the same kind of thing as a
-      # seat manager, and belongs in the same tier as the rest of them, so that everything
-      # above can assume it without naming it.
-      #
-      # Nothing about the bus either: it and its socket gate are in the head tier, and this is
-      # in the one after, so it is already behind both.
-      requires = [ "sysinit" ];
+      # the bus, which is how it is reached, the logger, and /run. A session manager is the same
+      # kind of thing as a seat manager, and anything which wants one names it.
+      requires = [
+        "tmpfiles-setup"
+      ]
+      ++ config.providers.services.lib.present [
+        "dbus"
+        "syslogd"
+      ];
 
       type.service = {
         command = "${lib.getExe' cfg.package "sessiond"} --config ${cfg.configFile} --log-target syslog";

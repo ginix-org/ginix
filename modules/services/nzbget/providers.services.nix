@@ -41,7 +41,13 @@ in
         inherit (cfg) user group;
 
         description = "nzbget daemon";
-        requires = [ "basic" ];
+        requires = [
+          "tmpfiles-setup"
+        ]
+        ++ config.providers.services.lib.present [
+          "syslogd"
+          "nftables"
+        ];
 
         # `pre` was finit's own start action, and `stop`/`reload` its own verbs - none of which
         # the contract models. The seeding `pre` did is folded into the command, which is the

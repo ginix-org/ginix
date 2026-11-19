@@ -9,11 +9,11 @@
 # deliberately not here: only finit and s6-rc can observe them, so a core test asking for one
 # would not be a core test. Each backend's own test covers those.
 #
-# A oneshot may wait too, with `type.oneshot.readiness`: it is done once its command has exited
-# and the thing named has appeared. That is the shape of a unit gating others on a device node,
-# which is tested here with a file a slow daemon creates instead, since a test machine has no
-# device to wait for that it could make appear on cue. It has no command at all, which is the
-# case that matters - a unit whose only job is the wait.
+# A oneshot has no readiness of its own - it is done once its command exits - so a unit gating
+# others on something appearing is a oneshot whose command is the wait, written with
+# `providers.services.lib.waitFor`. That is the shape of a gate on a device node, tested here
+# with a file a slow daemon creates instead, since a test machine has no device to wait for that
+# it could make appear on cue.
 #
 # Each daemon sleeps before it becomes live, so a dependant which started without waiting has
 # time to be caught doing it: it writes down whether what it required was there when it ran.
@@ -34,7 +34,7 @@ in
   name = "providers.readiness-${backend}";
 
   nodes.machine =
-    { ... }:
+    { config, ... }:
     {
       imports = [ (import ./base.nix { inherit backend coreLib; }) ];
 
@@ -45,7 +45,7 @@ in
             command = coreLib.slowDaemon "by-path" delay;
             readiness.waitFor.path.path = liveFile "by-path";
           };
-          requires = [ "sysinit" ];
+          requires = [ "tmpfiles-setup" ];
         };
 
         after-path = {
@@ -64,7 +64,7 @@ in
               done
             '';
           };
-          requires = [ "sysinit" ];
+          requires = [ "tmpfiles-setup" ];
         };
 
         after-check = {
@@ -73,18 +73,18 @@ in
         };
 
         # a oneshot which does nothing but wait. It requires only `sysinit`, as by-device does,
-        # so nothing orders it after the file appearing except its own readiness.
+        # so nothing orders it after the file appearing except the wait that is its command.
         by-device = {
           type.service.command = coreLib.slowDaemon "by-device" delay;
-          requires = [ "sysinit" ];
+          requires = [ "tmpfiles-setup" ];
         };
 
         device-gate = {
           type.oneshot = {
-            readiness.waitFor.path.path = liveFile "by-device";
-            readinessTimeout = 60;
+            command = config.providers.services.lib.waitFor.path (liveFile "by-device");
+            startTimeout = 60;
           };
-          requires = [ "sysinit" ];
+          requires = [ "tmpfiles-setup" ];
         };
 
         after-gate = {
@@ -117,11 +117,11 @@ in
             f"after-check started before by-check was live (saw {saw})"
         )
 
-    with subtest("a oneshot's readiness held its dependant until the path was there"):
+    with subtest("a waitFor gate held its dependant until the path was there"):
         saw = marker("after-gate.saw")
         assert saw == "yes", (
-            f"after-gate started before by-device was live (saw {saw}) - the oneshot was "
-            "treated as done without waiting for its readiness"
+            f"after-gate started before by-device was live (saw {saw}) - the gate was "
+            "treated as done without its wait having returned"
         )
 
     machine.shutdown()

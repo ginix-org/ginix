@@ -17,9 +17,14 @@ in
     providers.services.units.power-profiles-daemon = {
       description = "power profiles daemon";
 
-      # nothing about the bus: it and its socket gate are in the head tier, so anything here
-      # is after them
-      requires = [ "basic" ];
+      # the bus, which is how it is reached, and the logger
+      requires = [
+        "tmpfiles-setup"
+      ]
+      ++ config.providers.services.lib.present [
+        "syslogd"
+        "dbus"
+      ];
 
       type.service.command = "${cfg.package}/libexec/power-profiles-daemon";
     };

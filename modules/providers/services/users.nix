@@ -27,24 +27,12 @@
 let
   cfg = config.providers.services;
 
-  # the head of the trunk, which a user tree has one of too.
-  #
-  # `units.<name>.requires` defaults to it - "attach to the head of the tree you are in" - and
-  # that default is the shared unit type's, so a user unit which says nothing about ordering gets
-  # it as well. Rather than special-case the default, the tree is given the head it names: the
-  # implementation emits an anchor of this name beside the user's own units, in the user's own
-  # namespace, so the edge resolves where every other in-tree edge does.
-  #
-  # Without it, every user unit that did not write `requires` explicitly failed the check below
-  # against a level it never asked for.
-  head = lib.head cfg.trunk.levels;
-
   # edges leaving a user's own tree. a separate supervisor cannot observe the system's units, so
   # these name something it will never see: the unit waits for a dependency that cannot arrive.
   #
-  # what to do about one is always the same - move the thing being waited for earlier in the
-  # trunk, so it is already up by the time any session can start - and never to add the edge,
-  # because there is nowhere for it to go.
+  # what to do about one is always the same - make sure the thing being waited for is up before
+  # any session can start, which is the system's business - and never to add the edge, because
+  # there is nowhere for it to go.
   crossTree = lib.concatLists (
     lib.mapAttrsToList (
       user: u:
@@ -52,7 +40,7 @@ let
         lib.mapAttrsToList (
           name: unit:
           map (dep: "providers.services.users.${user}.units.${name} -> ${dep}") (
-            lib.filter (dep: dep != head && !(u.units ? ${dep})) unit.requires
+            lib.filter (dep: !(u.units ? ${dep})) unit.requires
           )
         ) u.units
       )
@@ -410,8 +398,8 @@ in
         A user's units are written as if that user were the only thing on the machine, and are
         the only things they may depend on: the supervisor running them is that user's own and
         cannot observe the system's units, so an edge naming one is refused rather than silently
-        never satisfied. Anything a tree needs from the system belongs earlier in the trunk,
-        where it is up before any session can start.
+        never satisfied. Anything a tree needs from the system has to be up before any session
+        can start, which is the system's to arrange.
 
         These start with a session and stop with it, which is what separates them from a system
         unit that merely runs as a user - {option}`providers.services.units` with `user` set is
@@ -556,10 +544,32 @@ in
 
           A user's supervisor is started by their session and knows only the units it was given,
           so a system unit named here is one it will wait for for ever. Depend on another unit of
-          the same user, or attach what is being waited for to an earlier trunk level so that it
-          is already up before any session begins.
+          the same user, or make sure what is being waited for is up before any session begins.
         '';
       }
+
+      # a user's supervisor ends with their session, not with the machine, and has no shutdown
+      # script to run - so a shutdown unit in a user's tree is one nothing would ever run
+      (
+        let
+          steps = lib.concatLists (
+            lib.mapAttrsToList (
+              user: u:
+              map (name: "providers.services.users.${user}.units.${name}") (
+                lib.attrNames (lib.filterAttrs (_: unit: unit.type ? shutdown) u.units)
+              )
+            ) cfg.users
+          );
+        in
+        {
+          assertion = steps == [ ];
+          message = ''
+            A user's tree cannot hold shutdown units, which run once on the way down - a user's
+            supervisor ends with their session and has nothing to run them from:
+            ${lib.concatStringsSep "\n" steps}
+          '';
+        }
+      )
     ];
   };
 }

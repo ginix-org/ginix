@@ -31,13 +31,19 @@ in
     providers.services.units.wpa_supplicant = {
       description = "wireless supplicant";
 
-      # the bus and its socket gate are in the head tier, so `service/dbus/ready` is behind
-      # this without being named
-      requires = [ "basic" ];
+      # the bus it is on, the logger, and the firewall where there is one
+      requires = [
+        "tmpfiles-setup"
+      ]
+      ++ config.providers.services.lib.present [
+        "dbus"
+        "syslogd"
+        "nftables"
+      ];
 
       # read from the store path named in the command, so a changed configuration is already a
       # changed unit; this is for the reload below rather than for the restart
-      reloadTriggers = lib.optional (cfg.interfaces != [ ]) cfg.configFile;
+      type.service.reloadTriggers = lib.optional (cfg.interfaces != [ ]) cfg.configFile;
 
       type.service = {
         inherit command;
