@@ -20,6 +20,9 @@ ANSI = re.compile(r"\x1b\[[0-?]*[ -/]*[@-~]")
 # of them all fits in on a runner - and not tests/modules, which is evaluation rather than VMs
 # and runs as a job of its own. Both stay `nix-build tests -A ...` away.
 SKIPPED_SUITES = ('modules', 'modules-boot')
+# top-level tests left out by name prefix. The no-initrd tests boot from a real disk image of
+# their whole closure, which does not finish inside a job's hour on a runner with a cold cache.
+SKIPPED_PREFIXES = ('no-initrd',)
 
 DISCOVER = r'''
 let
@@ -31,8 +34,14 @@ let
         (name: walk (path ++ [name]) (builtins.getAttr name value))
         (builtins.attrNames value))
     else [];
-in walk [] (builtins.removeAttrs (import ./tests {}) [ SKIPPED ])
-'''.replace('SKIPPED', ' '.join(f'"{s}"' for s in SKIPPED_SUITES))
+  tests = import ./tests {};
+  prefixes = [ PREFIXES ];
+  skipped = name: builtins.any
+    (prefix: builtins.substring 0 (builtins.stringLength prefix) name == prefix) prefixes;
+in walk [] (builtins.removeAttrs tests
+  ([ SKIPPED ] ++ builtins.filter skipped (builtins.attrNames tests)))
+'''.replace('SKIPPED', ' '.join(f'"{s}"' for s in SKIPPED_SUITES)).replace(
+    'PREFIXES', ' '.join(f'"{p}"' for p in SKIPPED_PREFIXES))
 
 
 def list_tests():

@@ -36,12 +36,19 @@ rec {
     ${mkdir} -p ${markerDir} 2>/dev/null || :
   '';
 
-  # appends its name to a single file, so the file is a record of the order units started in
+  # appends its name to a single file, so the file is a record of the order units started in.
+  #
+  # Then touches `recorded name`, which is what a recorder's readiness has to wait on: under the
+  # default `fork` readiness a unit is ready once spawned, so the next one in a chain can be
+  # spawned - and win the race to the file - before this shell has written anything.
+  recorded = name: "${markerDir}/${name}.recorded";
+
   recorder =
     name:
     pkgs.writeShellScript "record-${name}" ''
       ${preamble}
       echo ${name} >> ${markerDir}/order
+      ${touch} ${recorded name}
       exec ${sleep} infinity
     '';
 
